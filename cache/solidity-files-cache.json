@@ -38,8 +38,8 @@
       ]
     },
     "/Users/alexandremelo/Projects/pool/contracts/Vault.sol": {
-      "lastModificationDate": 1632161598445,
-      "contentHash": "68679d57c099d93651ab2ace39b69765",
+      "lastModificationDate": 1632161616765,
+      "contentHash": "77879bc09389082de63ca754080a4033",
       "sourceName": "contracts/Vault.sol",
       "solcConfig": {
         "version": "0.8.0",

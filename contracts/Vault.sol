@@ -12,9 +12,9 @@ contract Vault is Ownable {
     uint256 public vaultId = 0;
 
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided.
-        uint256 rewardDebt;     // How many LP tokens the user has provided.
-        uint256 lockTime; // Reward debt. See explanation below.
+        uint256 amount;
+        uint256 rewardDebt;
+        uint256 lockTime;
     }
 
     VaultInfo[] public vaultInfo;
@@ -25,11 +25,13 @@ contract Vault is Ownable {
         IERC20 token;
         uint256 vaultRewardsPerWeight;
         uint256 vaultTokenReserve;
-        uint256 startBlockTime;           // Address of LP token contract.
-        uint256 endBlockTime;           // Address of LP token contract.
-        uint256 userCount;           // Address of LP token contract.
-        bool isLpVault;           // Address of LP token contract.
-        bool created;           // Address of LP token contract.
+        uint256 startBlockTime;           
+        uint256 endBlockTime;           
+        uint256 userCount;           
+        bool isLpVault;           
+        bool created;           
+        bool paused;           
+        bool closed;           
     }
 
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
@@ -57,7 +59,9 @@ contract Vault is Ownable {
             endBlockTime : 25 days,
             userCount: 0,
             isLpVault : _isLp,
-            created: true
+            created: true,
+            paused: false,
+            closed: false
         }));
 
         vaultId = vaultId++;
@@ -95,8 +99,12 @@ contract Vault is Ownable {
     }
 
     function deposit(uint256 _vid, uint256 _lockTime, uint256 _amount) public {
-        require(vaultInfo[_vid].created == true, "Vault not found");
-        VaultInfo memory vault = vaultInfo[_vid];
+        VaultInfo storage vault = vaultInfo[_vid];
+        require(vault.token.balanceOf(msg.sender) >= _amount);
+        require(vault.created == true, "Vault not found");
+        require(vault.closed == false, "Vault closed");
+        require(vault.paused == false, "Vault paused");
+
         UserInfo storage user = userInfo[_vid][msg.sender];
 
         require(vault.token.transferFrom(address(msg.sender), address(this), _amount));
@@ -104,16 +112,22 @@ contract Vault is Ownable {
         user.amount = user.amount + _amount;
 
         if(user.lockTime == 0){
+            vault.userCount = vault.userCount++;
             user.lockTime = _lockTime;
         }
     }
 
-    function withdraw(uint256 _pid, uint256 _amount) public {
-        require(_amount > 0, 'amount 0');
-        UserInfo storage user = userInfo[_pid][msg.sender];
-        require(user.amount >= _amount, "withdraw: not enough");
+    function withdraw(uint256 _vid) public {
+        VaultInfo storage vault = vaultInfo[_vid];
+        require(vault.created == true, "Vault not found");
+        require(vault.paused == false, "Vault paused");
+        UserInfo storage user = userInfo[_vid][_user];
+        require(user.lockTime >= vault.endBlockTime, "Vault paused");
 
-        VaultInfo storage pool = vaultInfo[_pid];
+        uint256 total = user.amount + user.rewardDebt;
+
+
+
 
         //require(pool.transfer((address(msg.sender), _amout)));
     }
