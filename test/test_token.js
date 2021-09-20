@@ -28,14 +28,14 @@ describe('ETH MINT BURN', () => {
 
         it('Happy path', async () => {
 
-            let bag = ethers.utils.parseUnits("200000", "gwei");
+            let ownerBag = ethers.utils.parseUnits("200000", "gwei");
 
-            await token.approve(vault.address, bag);
+            await token.approve(vault.address, ownerBag);
   
             await vault.createVault(
               token.address,
               false,
-              bag
+              ownerBag
             );
 
             let result = await vault.getVault(0);
@@ -50,21 +50,27 @@ describe('ETH MINT BURN', () => {
 
             console.log(result);
 
-            const bag = ethers.utils.parseUnits("250000", "gwei")
+            const userBag = ethers.utils.parseUnits("50000", "gwei")
+
+            //await network.provider.send("evm_increaseTime", [3600])
+
+            await token.connect(addr1).approve(vault.address, userBag);
 
             vault.connect(addr1).deposit(
                 0,
-                0,
-                bag,
+                1632958826,
+                userBag,
             );
 
-            /*
+            console.log((await vault.getUserVaultAmount(0, addr1.address)).toString())
+
+            
             console.log((await token.totalSupply()).toString());
             console.log(parseInt(await token.balanceOf(addr1.address)));
             console.log(parseInt(await token.balanceOf(addr2.address)));
             console.log(parseInt(await token.balanceOf(owner.address)));
             console.log(parseInt(await token.balanceOf(vault.address)));
-            */
+
          });
     });
 

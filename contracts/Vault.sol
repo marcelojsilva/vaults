@@ -4,6 +4,7 @@ pragma solidity 0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "hardhat/console.sol";
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
@@ -25,6 +26,7 @@ contract Vault is Ownable {
         uint256 vaultTokenReserve;
         uint256 startBlockTime;           // Address of LP token contract.
         uint256 endBlockTime;           // Address of LP token contract.
+        uint256 userCount;           // Address of LP token contract.
         bool isLpVault;           // Address of LP token contract.
         bool created;           // Address of LP token contract.
     }
@@ -52,6 +54,7 @@ contract Vault is Ownable {
             vaultTokenReserve : _amount,
             startBlockTime : block.timestamp,
             endBlockTime : 25 days,
+            userCount: 0,
             isLpVault : _isLp,
             created: true
         }));
@@ -92,6 +95,13 @@ contract Vault is Ownable {
 
         require(pool.token.transferFrom(address(msg.sender), address(this), _amount));
         user.amount = user.amount + _amount;
+
+        console.log();
+    }
+
+    function getUserVaultAmount(uint256 _vid, address _userId) public view returns (uint256){
+        UserInfo storage user = userInfo[_vid][msg.sender];
+        return user.amount;
     }
 
     function withdraw(uint256 _pid, uint256 _amount) public {
