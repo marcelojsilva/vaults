@@ -109,26 +109,30 @@ contract Vault is Ownable {
 
         require(vault.token.transferFrom(address(msg.sender), address(this), _amount));
 
-        user.amount = user.amount + _amount;
-
-        if(user.lockTime == 0){
-            vault.userCount = vault.userCount++;
+        if(user.amount == 0){
+            vault.userCount = vault.userCount + 1;
             user.lockTime = _lockTime;
         }
+
+        user.amount = user.amount + _amount;
     }
 
     function withdraw(uint256 _vid) public {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.created == true, "Vault not found");
         require(vault.paused == false, "Vault paused");
-        UserInfo storage user = userInfo[_vid][_user];
-        require(user.lockTime >= vault.endBlockTime, "Vault paused");
+
+        UserInfo storage user = userInfo[_vid][msg.sender];
+        //require(user.lockTime >= vault.endBlockTime, "Vault paused");
 
         uint256 total = user.amount + user.rewardDebt;
 
+        require(vault.token.transfer(address(msg.sender), total));
 
+        console.log(vault.userCount);
 
+        vault.userCount = vault.userCount - 1;
 
-        //require(pool.transfer((address(msg.sender), _amout)));
+        delete userInfo[_vid][msg.sender];
     }
 }

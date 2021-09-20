@@ -74,6 +74,10 @@ describe('ETH MINT BURN', () => {
             */
             console.log(parseInt(await token.balanceOf(vault.address)));
 
+            await vault.connect(addr1).withdraw(0);
+
+            console.log(parseInt(await token.balanceOf(vault.address)));
+
          });
     });
 
