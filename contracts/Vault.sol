@@ -26,6 +26,7 @@ contract Vault is Ownable {
         uint256 startBlockTime;           // Address of LP token contract.
         uint256 endBlockTime;           // Address of LP token contract.
         bool isLpVault;           // Address of LP token contract.
+        bool created;           // Address of LP token contract.
     }
 
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
@@ -51,7 +52,8 @@ contract Vault is Ownable {
             vaultTokenReserve : _amount,
             startBlockTime : block.timestamp,
             endBlockTime : 25 days,
-            isLpVault : _isLp
+            isLpVault : _isLp,
+            created: true
         }));
 
         vaultId = vaultId++;
@@ -80,8 +82,13 @@ contract Vault is Ownable {
     }
 
     function deposit(uint256 _pid, uint256 _lockTime, uint256 _amount) public {
+        require(vaultInfo[_pid].created == true, "Vault not found");
         VaultInfo storage pool = vaultInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
+
+        if(user.amount == 0) {
+            user.rewardDebt = 0;
+        }
 
         require(pool.token.transferFrom(address(msg.sender), address(this), _amount));
         user.amount = user.amount + _amount;

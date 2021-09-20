@@ -50,6 +50,14 @@ describe('ETH MINT BURN', () => {
 
             console.log(result);
 
+            const bag = ethers.utils.parseUnits("250000", "gwei")
+
+            vault.connect(addr1).deposit(
+                0,
+                0,
+                bag,
+            );
+
             /*
             console.log((await token.totalSupply()).toString());
             console.log(parseInt(await token.balanceOf(addr1.address)));
