@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/alexandremelo/Projects/pool/contracts/NoFeeToken.sol": {
-      "lastModificationDate": 1632143714207,
-      "contentHash": "7f1107549221ca35767f41bb8f49d827",
+      "lastModificationDate": 1632145217089,
+      "contentHash": "1684d0674161ac1f2b34ca8460b3ed73",
       "sourceName": "contracts/NoFeeToken.sol",
       "solcConfig": {
         "version": "0.8.0",
@@ -34,7 +34,7 @@
         "^0.8.0"
       ],
       "artifacts": [
-        "SimpleToken"
+        "NoFeeToken"
       ]
     },
     "/Users/alexandremelo/Projects/pool/contracts/Vault.sol": {

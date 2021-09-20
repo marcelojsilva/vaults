@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  * `ERC20` functions.
  * Based on https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v2.5.1/contracts/examples/SimpleToken.sol
  */
-contract SimpleToken is ERC20 {
+contract NoFeeToken is ERC20 {
     /**
      * @dev Constructor that gives msg.sender all of existing tokens.
      */
