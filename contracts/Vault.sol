@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Vault is Ownable{
+contract Vault is Ownable {
     using SafeERC20 for IERC20;
 
     uint256 public vaultId = 0;
@@ -15,18 +15,23 @@ contract Vault is Ownable{
         uint256 rewardDebt; // Reward debt. See explanation below.
     }
 
-    enum Type { Token, Lp }
-
-    PoolInfo[] public poolInfo;
+    VaultInfo[] public vaultInfo;
 
     // Info of each pool.
-    struct PoolInfo {
-        uint256 pid;
-        IERC20 token;           // Address of LP token contract.
-        uint256 amount;           // Address of LP token contract.
+    struct VaultInfo {
+        uint256 vid;
+        IERC20 token;
+        uint256 vaultRewardsPerWeight;
+        uint256 vaultTokenReserve;
+        uint256 startBlockTime;           // Address of LP token contract.
+        uint256 endBlockTime;           // Address of LP token contract.
+        bool isLpVault;           // Address of LP token contract.
     }
 
-    mapping (uint256 => mapping (address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+
+    // addresses list
+    uint256[] public addressList;
 
     //address public babydogeAddr = 0xc748673057861a797275cd8a068abb95a902e8de;
 
@@ -35,35 +40,60 @@ contract Vault is Ownable{
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-   function createPool(IERC20 _token, uint256 _type, uint256 _endBlock, uint256 _amount) public {
-       require((_type == 1 || _type == 2), "Invalid type");
+    function createVault(IERC20 _token, bool _isLp, uint256 _amount) public {
+        require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
 
-       vaultId = vaultId++;
-
-        poolInfo.push(PoolInfo({
-            pid: vaultId,
-            token: _token,
-            amount: _amount
+        vaultInfo.push(VaultInfo({
+            vid : vaultId,
+            token : _token,
+            vaultRewardsPerWeight : 1,
+            vaultTokenReserve : _amount,
+            startBlockTime : block.timestamp,
+            endBlockTime : 25 days,
+            isLpVault : _isLp
         }));
 
-       //remover taxa
-       require(_token.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
+        vaultId = vaultId++;
+
+        //remover taxa
+        require(_token.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
     }
 
-      // Deposit LP tokens to MasterChef for CAKE allocation.
-    function deposit(uint256 _pid, uint256 _amount) public {
-        PoolInfo storage pool = poolInfo[_pid];
+    function getVault(uint256 _vid) public view returns (uint256, IERC20, uint256, uint256, uint256){
+        VaultInfo storage vault = vaultInfo[_vid];
+        return (
+            vault.vid,
+            vault.token,
+            vault.vaultTokenReserve,
+            vault.startBlockTime,
+            vault.endBlockTime
+        );
+    }
+
+    function pendingReward(uint256 _pid, address _user) public {
+
+    }
+
+    function updateVault() public {
+
+    }
+
+    function deposit(uint256 _pid, uint256 _lockTime, uint256 _amount) public {
+        VaultInfo storage pool = vaultInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
-        //controlar novos depositos
         require(pool.token.transferFrom(address(msg.sender), address(this), _amount));
         user.amount = user.amount + _amount;
     }
 
+    function withdraw(uint256 _pid, uint256 _amount) public {
+        require(_amount > 0, 'amount 0');
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        require(user.amount >= _amount, "withdraw: not enough");
 
-    //100000
+        VaultInfo storage pool = vaultInfo[_pid];
 
-    //511
+        //require(pool.transfer((address(msg.sender), _amout)));
+    }
 }
