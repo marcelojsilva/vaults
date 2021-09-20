@@ -13,7 +13,8 @@ contract Vault is Ownable {
 
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 rewardDebt;     // How many LP tokens the user has provided.
+        uint256 lockTime; // Reward debt. See explanation below.
     }
 
     VaultInfo[] public vaultInfo;
@@ -65,8 +66,17 @@ contract Vault is Ownable {
         require(_token.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
     }
 
+    function getUserVaultInfo(uint256 _vid, address _user) public view returns (uint256, uint256, uint256){
+        UserInfo memory user = userInfo[_vid][_user];
+        return (
+            user.amount,
+            user.rewardDebt,
+            user.lockTime
+        );
+    }
+
     function getVault(uint256 _vid) public view returns (uint256, IERC20, uint256, uint256, uint256){
-        VaultInfo storage vault = vaultInfo[_vid];
+        VaultInfo memory vault = vaultInfo[_vid];
         return (
             vault.vid,
             vault.token,
@@ -84,24 +94,18 @@ contract Vault is Ownable {
 
     }
 
-    function deposit(uint256 _pid, uint256 _lockTime, uint256 _amount) public {
-        require(vaultInfo[_pid].created == true, "Vault not found");
-        VaultInfo storage pool = vaultInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
+    function deposit(uint256 _vid, uint256 _lockTime, uint256 _amount) public {
+        require(vaultInfo[_vid].created == true, "Vault not found");
+        VaultInfo memory vault = vaultInfo[_vid];
+        UserInfo storage user = userInfo[_vid][msg.sender];
 
-        if(user.amount == 0) {
-            user.rewardDebt = 0;
-        }
+        require(vault.token.transferFrom(address(msg.sender), address(this), _amount));
 
-        require(pool.token.transferFrom(address(msg.sender), address(this), _amount));
         user.amount = user.amount + _amount;
 
-        console.log();
-    }
-
-    function getUserVaultAmount(uint256 _vid, address _userId) public view returns (uint256){
-        UserInfo storage user = userInfo[_vid][msg.sender];
-        return user.amount;
+        if(user.lockTime == 0){
+            user.lockTime = _lockTime;
+        }
     }
 
     function withdraw(uint256 _pid, uint256 _amount) public {

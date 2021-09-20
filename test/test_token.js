@@ -48,7 +48,7 @@ describe('ETH MINT BURN', () => {
                 4: endBlockTime,
             } = result;
 
-            console.log(result);
+            //console.log(result);
 
             const userBag = ethers.utils.parseUnits("50000", "gwei")
 
@@ -56,19 +56,22 @@ describe('ETH MINT BURN', () => {
 
             await token.connect(addr1).approve(vault.address, userBag);
 
-            vault.connect(addr1).deposit(
+            await vault.connect(addr1).deposit(
                 0,
                 1632958826,
                 userBag,
             );
 
-            console.log((await vault.getUserVaultAmount(0, addr1.address)).toString())
+            console.log(
+                (await vault.getUserVaultInfo(0, addr1.address)).toString()
+            );
 
-            
+            /*
             console.log((await token.totalSupply()).toString());
             console.log(parseInt(await token.balanceOf(addr1.address)));
             console.log(parseInt(await token.balanceOf(addr2.address)));
             console.log(parseInt(await token.balanceOf(owner.address)));
+            */
             console.log(parseInt(await token.balanceOf(vault.address)));
 
          });

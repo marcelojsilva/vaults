@@ -38,8 +38,8 @@
       ]
     },
     "/Users/alexandremelo/Projects/pool/contracts/Vault.sol": {
-      "lastModificationDate": 1632159023763,
-      "contentHash": "c1ce1109a14889a5abdfa6c74b3a88eb",
+      "lastModificationDate": 1632161598445,
+      "contentHash": "68679d57c099d93651ab2ace39b69765",
       "sourceName": "contracts/Vault.sol",
       "solcConfig": {
         "version": "0.8.0",
@@ -66,7 +66,8 @@
       "imports": [
         "@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
-        "@openzeppelin/contracts/access/Ownable.sol"
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "hardhat/console.sol"
       ],
       "versionPragmas": [
         "0.8.0"
@@ -322,6 +323,40 @@
       ],
       "artifacts": [
         "IERC20Metadata"
+      ]
+    },
+    "/Users/alexandremelo/Projects/pool/node_modules/hardhat/console.sol": {
+      "lastModificationDate": 1632145119983,
+      "contentHash": "cc4777addd464ea56fa35b1c45df0591",
+      "sourceName": "hardhat/console.sol",
+      "solcConfig": {
+        "version": "0.8.0",
+        "settings": {
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.4.22 <0.9.0"
+      ],
+      "artifacts": [
+        "console"
       ]
     }
   }
