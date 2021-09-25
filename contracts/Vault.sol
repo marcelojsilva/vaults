@@ -5,68 +5,68 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
+import "./SafeMath.sol";
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
+    using SafeMath for uint;
 
-    uint256 public vaultId = 0;
+    uint public vaultId = 0;
+    uint public taxForNonBabyDogeCoin = 0;
 
     struct UserInfo {
-        uint256 amount;
-        uint256 lastReawardBlock;
-        uint256 reward;
-        uint256 rewardWithdraw;
-        uint256 lockTime;
+        uint amount;
+        uint lastRewardTime;
+        uint rewardDebt;
+        uint rewardWithdraw;
+        uint lockTime;
     }
 
     VaultInfo[] public vaultInfo;
 
-    // Info of each pool.
     struct VaultInfo {
         IERC20 token;
-        uint256 amountReward;
-        uint256 vaultTokenTax;
-        uint256 startBlockTime;           
-        uint256 blockDays;
-        uint256 totalBlocks;
-        uint256 userCount;  
-        uint256 userAmount;         
+        uint amountReward;
+        uint vaultTokenTax;
+        uint startBlockTime;           
+        uint endTimeBlockTime;
+        uint userCount;  
+        uint usersAmount;         
         bool isLpVault;           
         bool created;           
         bool paused;           
         bool closed;           
     }
 
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(uint => mapping(address => UserInfo)) public userInfo;
 
     // addresses list
-    uint256[] public addressList;
+    uint[] public addressList;
 
     //address public babydogeAddr = 0xc748673057861a797275cd8a068abb95a902e8de;
 
-    //uint256 public startBlock;
-    //uint256 public endBlock;
+    event Deposit(address indexed user, uint indexed pid, uint amount);
+    event Withdraw(address indexed user, uint indexed pid, uint amount);
 
-    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-
-    function createVault(IERC20 _token, bool _isLp, uint256 _blockDays, uint256 _amount) public {
+    constructor(
+        uint _taxForNonBabyDogeCoin 
+    )
+    {
+        taxForNonBabyDogeCoin = _taxForNonBabyDogeCoin;
+    }
+    function createVault(IERC20 _token, bool _isLp, uint _blockDays, uint _amount) public {
         require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
-        
         //TODO validate tax free for babydoge 
-        uint256 _amountReserve = _amount / 100 * 98;
-        uint256 _tax = _amount / 100 * 2;
-        // console.log("block.number: %s + days: %s", block.number, block + _blockDays);
-
+        uint _amountReserve = _amount / 100 * (100 - taxForNonBabyDogeCoin);
+        uint _tax = _amount / 100 * taxForNonBabyDogeCoin;
         vaultInfo.push(VaultInfo({
             token : _token,
             amountReward : _amountReserve,
             vaultTokenTax : _tax,
             startBlockTime : block.timestamp,
-            blockDays : _blockDays,
-            totalBlocks: _blockDays, //TODO usando como total de blocos para teste
+            endTimeBlockTime: block.timestamp.add(_blockDays * 24 * 60 *60), 
             userCount: 0,
-            userAmount: 0,
+            usersAmount: 0,
             isLpVault : _isLp,
             created: true,
             paused: false,
@@ -76,18 +76,18 @@ contract Vault is Ownable {
         require(_token.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
     }
 
-    function getUserVaultInfo(uint256 _vid, address _user) public view returns (uint256, uint256, uint256, uint256, uint256){
+    function getUserVaultInfo(uint _vid, address _user) public view returns (uint, uint, uint, uint, uint){
         UserInfo memory user = userInfo[_vid][_user];
         return (
             user.amount,
-            user.lastReawardBlock,
-            user.reward,
+            user.lastRewardTime,
+            user.rewardDebt,
             user.rewardWithdraw,
             user.lockTime
         );
     }
     
-    // function getVault(uint256 _vid) public view returns (IERC20, uint256, uint256, uint256, uint256, uint256){
+    // function getVault(uint _vid) public view returns (IERC20, uint, uint, uint, uint, uint){
     //     VaultInfo memory vault = vaultInfo[_vid];
     //     return (
     //         vault.token,
@@ -99,67 +99,71 @@ contract Vault is Ownable {
     //     );
     // }
 
-    function pendingReward(uint256 _vid, address _user) public {
+    function pendingReward(uint _vid, address _user) public {
 
     }
 
-    function updateVault() public {
-        // VaultInfo storage vault = vaultInfo[_vid];
-        // if (block.number <= vault.lastRewardBlock) {
-        //     return;
-        // }
-        // uint256 lpSupply = vault.lpToken.balanceOf(address(this));
-        // if (lpSupply == 0) {
-        //     vault.lastRewardBlock = block.number;
-        //     return;
-        // }
-        // uint256 multiplier = block.number - vault.lastRewardBlock;
-        // uint256 cakeReward = multiplier.mul(cakePerBlock).mul(vault.allocPoint).div(totalAllocPoint);
-        // cake.mint(devaddr, cakeReward.div(10));
-        // cake.mint(address(syrup), cakeReward);
-        // vault.accCakePerShare = vault.accCakePerShare.add(cakeReward.mul(1e12).div(lpSupply));
-        // vault.lastRewardBlock = block.number;
+    function rewardCalculate(uint _vid) internal view returns (uint)
+    {
+        UserInfo memory user = userInfo[_vid][msg.sender];
+        uint lastRewardTime = user.lastRewardTime;
+        if (block.timestamp <= lastRewardTime) {
+            return 0;
+        }
+        VaultInfo memory vault = vaultInfo[_vid];
+        if (vault.usersAmount == 0) {
+            return 0;
+        }
+        if (vault.usersAmount == 0) {
+            return 0;
+        }
+        uint totalSeconds = vault.endTimeBlockTime.sub(vault.startBlockTime);
+        uint pointsPerSecond = vault.amountReward.mul(1e12).div(totalSeconds);
+        uint multiplier = block.timestamp.sub(lastRewardTime);
+        uint reward = multiplier.mul(pointsPerSecond).mul(user.amount).div(vault.usersAmount).div(1e12);
+        return reward;
     }
 
-    function deposit(uint256 _vid, uint256 _lockTime, uint256 _amount) public {
+    function deposit(uint _vid, uint _lockTime, uint value) external returns (bool) {
+        require(value > 0, 'Deposit must be greater than zero');
         VaultInfo storage vault = vaultInfo[_vid];
-        require(vault.token.balanceOf(msg.sender) >= _amount);
+        // require(vault.token.balanceOf(msg.sender) >= _amount); //TODO qual necessidade desta validação?
         require(vault.created == true, "Vault not found");
         require(vault.closed == false, "Vault closed");
         require(vault.paused == false, "Vault paused");
+        // require(block.timestamp >= vault.endTimeBlockTime, "Vault not started");
+        // require(block.timestamp <= vault.endTimeBlockTime, "Vault finiched");
+        require(vault.token.transferFrom(address(msg.sender), address(this), value));
 
         UserInfo storage user = userInfo[_vid][msg.sender];
 
-        require(vault.token.transferFrom(address(msg.sender), address(this), _amount));
-
-        uint256 pointsPerBlock = vault.amountReward / vault.totalBlocks;
-        // console.log("Before: pointsPerBlock     %s, vault.userAmount    %s, user.reward             %s", pointsPerBlock, vault.userAmount, user.reward);
-        // console.log("Before: vault.amountReward %s, user.amount         %s, user.lastReawardBlock   %s", vault.amountReward, user.amount, user.lastReawardBlock);
-        vault.userAmount = vault.userAmount + _amount;
-        if(user.amount == 0){
-            vault.userCount = vault.userCount + 1;
-        } else {
-            user.reward = user.reward + ((block.number - user.lastReawardBlock) * pointsPerBlock * user.amount / vault.userAmount);
+        uint reward = rewardCalculate(_vid);
+        if (user.amount == 0) {
+            user.lockTime = _lockTime;
         }
-        user.lastReawardBlock = block.number;
-        user.amount = user.amount + _amount;
-        user.lockTime = _lockTime; // TODO validar como ficará locktime quando houver segundo depósito, valerá o último?
-        
-        // console.log("After:  pointsPerBlock     %s, vault.userAmount    %s, user.reward             %s", pointsPerBlock, vault.userAmount, user.reward);
-        // console.log("After:  vault.amountReward %s, user.amount         %s, user.lastReawardBlock   %s", vault.amountReward, user.amount, user.lastReawardBlock);
+        vault.usersAmount = vault.usersAmount.add(value);
+        user.amount = user.amount.add(value);
+        user.rewardDebt = user.rewardDebt.add(reward);
+        user.lastRewardTime = block.timestamp;
 
-        emit Deposit(msg.sender, _vid, _amount);
+        // console.log("User After:\n user.amount\n %s\n user.rewardDebt\n %s\n user.lastRewardTime\n %s\n", user.amount, user.rewardDebt, user.lastRewardTime);
+        // console.log("Vault After:\n vault.amountReward\n %s\n vault.startBlockTime\n %s\n vault.usersAmount\n %s\n", vault.amountReward, vault.startBlockTime, vault.usersAmount);
+
+        emit Deposit(msg.sender, _vid, value);
+        return true;
     }
 
-    function withdraw(uint256 _vid) public {
+
+    function withdraw(uint _vid) public {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.created == true, "Vault not found");
         require(vault.paused == false, "Vault paused");
-
+        UserInfo memory user = userInfo[_vid][msg.sender];
+        require(user.lockTime >= block.timestamp, "User in lock time");
         // UserInfo storage user = userInfo[_vid][msg.sender];
-        //require(user.lockTime >= vault.endBlockTime, "Vault paused");
+        // require(user.lockTime >= vault.startBlockTime.add(vault.blockDays), "User in lockTime");
 
-        // uint256 total = user.amount + user.rewardDebt;
+        // uint total = user.amount + user.rewardDebt;
 
         // require(vault.token.transfer(address(msg.sender), total));
 
