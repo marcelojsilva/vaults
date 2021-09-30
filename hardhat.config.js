@@ -4,6 +4,7 @@
 require('@nomiclabs/hardhat-waffle');
 require('dotenv').config({path: __dirname + '/.env'});
 require("@nomiclabs/hardhat-etherscan");
+require("hardhat-gas-reporter");
 
 task('accounts', "Print all accounts").setAction(async () => {
     const accounts = await ethers.getSigners();
@@ -14,6 +15,17 @@ task('accounts', "Print all accounts").setAction(async () => {
 })
 
 module.exports = {
+    networks: {
+        hardhat: {
+            // allowUnlimitedContractSize: true
+            blockGasLimit: 60000000,
+            gasPrice: 4000000000
+        }
+    },
+    gasReporter: {
+        currency: 'USD',
+        gasPrice: 40
+    },
     solidity: {
         settings: {
             optimizer: {
