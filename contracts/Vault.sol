@@ -5,169 +5,262 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
+import "./SafeMath.sol";
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
+    using SafeMath for uint;
 
-    uint256 public vaultId = 0;
+    uint public taxForNonBabyDogeCoin = 0;
+
+    struct UserInvest {
+        uint amount;
+        uint weight;
+    }
+    UserInvest[] private userInvest;
 
     struct UserInfo {
-        uint256 amount;
-        uint256 lastReawardBlock;
-        uint256 reward;
-        uint256 rewardWithdraw;
-        uint256 lockTime;
+        uint userInvestPos;
+        uint rewardDebt;
+        uint rewardWithdraw;
+        uint lockTime;
+        uint lockDays;
+        uint lastRewardDay;
+        bool exists;
     }
+    mapping(uint => mapping(address => UserInfo)) public userInfo;
 
-    VaultInfo[] public vaultInfo;
+    struct TotalDay {
+        uint amount;
+        uint weight;
+        // UserInvest[] userInvest;
+        bool exists;
+    }
+    mapping(uint => mapping(uint => TotalDay)) public totalDay;
 
-    // Info of each pool.
     struct VaultInfo {
         IERC20 token;
-        uint256 amountReward;
-        uint256 vaultTokenTax;
-        uint256 startBlockTime;           
-        uint256 blockDays;
-        uint256 totalBlocks;
-        uint256 userCount;  
-        uint256 userAmount;         
-        bool isLpVault;           
-        bool created;           
-        bool paused;           
-        bool closed;           
+        uint amountReward;
+        uint vaultTokenTax;
+        uint startVault;
+        uint endVault;
+        uint lockDays;
+        uint userCount;
+        uint usersAmount;
+        bool isLpVault;
+        bool paused;
+        uint lastTotalDay;
     }
-
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
-
-    // addresses list
-    uint256[] public addressList;
+    VaultInfo[] public vaultInfo;
 
     //address public babydogeAddr = 0xc748673057861a797275cd8a068abb95a902e8de;
 
-    //uint256 public startBlock;
-    //uint256 public endBlock;
+    event Deposit(address indexed user, uint indexed pid, uint amount);
+    event Withdraw(address indexed user, uint indexed pid, uint amount);
 
-    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-
-    function createVault(IERC20 _token, bool _isLp, uint256 _blockDays, uint256 _amount) public {
-        require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
-        
-        //TODO validate tax free for babydoge 
-        uint256 _amountReserve = _amount / 100 * 98;
-        uint256 _tax = _amount / 100 * 2;
-        // console.log("block.number: %s + days: %s", block.number, block + _blockDays);
-
-        vaultInfo.push(VaultInfo({
-            token : _token,
-            amountReward : _amountReserve,
-            vaultTokenTax : _tax,
-            startBlockTime : block.timestamp,
-            blockDays : _blockDays,
-            totalBlocks: _blockDays, //TODO usando como total de blocos para teste
-            userCount: 0,
-            userAmount: 0,
-            isLpVault : _isLp,
-            created: true,
-            paused: false,
-            closed: false
-        }));
-
-        require(_token.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
+    constructor(uint _taxForNonBabyDogeCoin) {
+        taxForNonBabyDogeCoin = _taxForNonBabyDogeCoin;
     }
 
-    function getUserVaultInfo(uint256 _vid, address _user) public view returns (uint256, uint256, uint256, uint256, uint256){
+    function createVault(
+        IERC20 _token,
+        bool _isLp,
+        uint _lockDays,
+        uint _amount
+    ) public {
+        require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
+        //TODO validate tax free for babydoge
+        uint _amountReserve = (_amount / 100) *
+            (100 - taxForNonBabyDogeCoin);
+        uint _tax = (_amount / 100) * taxForNonBabyDogeCoin;
+        
+        vaultInfo.push(
+            VaultInfo({
+                token: _token,
+                amountReward: _amountReserve,
+                vaultTokenTax: _tax,
+                startVault: block.timestamp,
+                endVault: block.timestamp.add(_lockDays * 24 * 60 * 60),
+                lockDays: _lockDays,
+                userCount: 0,
+                usersAmount: 0,
+                isLpVault: _isLp,
+                paused: false,
+                lastTotalDay: block.timestamp.div(1 days).sub(1)
+            })
+        );
+        uint vaultId = vaultInfo.length - 1;
+        uint _today = today();
+        TotalDay storage _totalDay = totalDay[vaultId][_today];
+        _totalDay.amount = 0;
+        _totalDay.exists = true;
+
+        require(
+            _token.transferFrom(address(msg.sender), address(this), _amount),
+            "Can't transfer tokens."
+        );
+    }
+
+    function getUserInfo(uint _vid, address _user)
+        public view 
+        returns (
+            uint,
+            uint,
+            uint,
+            uint,
+            uint
+        )
+    {
         UserInfo memory user = userInfo[_vid][_user];
         return (
-            user.amount,
-            user.lastReawardBlock,
-            user.reward,
+            userInvest[user.userInvestPos].amount,
+            userInvest[user.userInvestPos].weight,
+            user.rewardDebt,
             user.rewardWithdraw,
             user.lockTime
         );
     }
-    
-    // function getVault(uint256 _vid) public view returns (IERC20, uint256, uint256, uint256, uint256, uint256){
-    //     VaultInfo memory vault = vaultInfo[_vid];
-    //     return (
-    //         vault.token,
-    //         vault.amountReward,
-    //         vault.vaultTokenTax,
-    //         vault.blockDays,
-    //         vault.startBlockTime,
-    //         vault.endBlockTime
-    //     );
-    // }
 
-    function pendingReward(uint256 _vid, address _user) public {
-
+    function getVault(uint _vid) public view returns (IERC20, uint, uint, uint, uint, uint){
+        VaultInfo memory vault = vaultInfo[_vid];
+        return (
+            vault.token,
+            vault.amountReward,
+            vault.vaultTokenTax,
+            vault.lockDays,
+            vault.startVault,
+            vault.endVault
+        );
     }
 
-    function updateVault() public {
-        // VaultInfo storage vault = vaultInfo[_vid];
-        // if (block.number <= vault.lastRewardBlock) {
-        //     return;
-        // }
-        // uint256 lpSupply = vault.lpToken.balanceOf(address(this));
-        // if (lpSupply == 0) {
-        //     vault.lastRewardBlock = block.number;
-        //     return;
-        // }
-        // uint256 multiplier = block.number - vault.lastRewardBlock;
-        // uint256 cakeReward = multiplier.mul(cakePerBlock).mul(vault.allocPoint).div(totalAllocPoint);
-        // cake.mint(devaddr, cakeReward.div(10));
-        // cake.mint(address(syrup), cakeReward);
-        // vault.accCakePerShare = vault.accCakePerShare.add(cakeReward.mul(1e12).div(lpSupply));
-        // vault.lastRewardBlock = block.number;
-    }
-
-    function deposit(uint256 _vid, uint256 _lockTime, uint256 _amount) public {
+    function deposit(
+        uint _vid,
+        uint _lockDays,
+        uint value
+    ) external returns (bool) {
+        require(value > 0, "Deposit must be greater than zero");
         VaultInfo storage vault = vaultInfo[_vid];
-        require(vault.token.balanceOf(msg.sender) >= _amount);
-        require(vault.created == true, "Vault not found");
-        require(vault.closed == false, "Vault closed");
         require(vault.paused == false, "Vault paused");
+        require(block.timestamp >= vault.startVault, "Vault not started");
+        require(block.timestamp <= vault.endVault, "Vault finiched");
+        require(
+            vault.token.transferFrom(address(msg.sender), address(this), value)
+        );
+        uint _today = today();
 
         UserInfo storage user = userInfo[_vid][msg.sender];
-
-        require(vault.token.transferFrom(address(msg.sender), address(this), _amount));
-
-        uint256 pointsPerBlock = vault.amountReward / vault.totalBlocks;
-        // console.log("Before: pointsPerBlock     %s, vault.userAmount    %s, user.reward             %s", pointsPerBlock, vault.userAmount, user.reward);
-        // console.log("Before: vault.amountReward %s, user.amount         %s, user.lastReawardBlock   %s", vault.amountReward, user.amount, user.lastReawardBlock);
-        vault.userAmount = vault.userAmount + _amount;
-        if(user.amount == 0){
-            vault.userCount = vault.userCount + 1;
+        uint stakeWeight = (user.lockDays.mul(1e9))
+            .div(vault.lockDays)
+            .add(1e9);
+        if (!user.exists) {
+            user.exists = true;
+            uint _lockTime = block.timestamp.add(_lockDays*24*60*60);
+            _lockTime = _lockTime > vault.endVault
+                ? vault.endVault 
+                : _lockTime;
+            user.lockTime = _lockTime;
+            user.lockDays = _lockDays;
+            userInvest.push(UserInvest(0,0));
+            uint userInvestPos = userInvest.length - 1;
+            user.userInvestPos = userInvestPos;
+            user.lastRewardDay = _today;
+            vault.userCount += 1;
+            //Novos depósitos do usuário devem manter o mesmo peso do primeiro depósito
+            userInvest[user.userInvestPos].weight = stakeWeight;
         } else {
-            user.reward = user.reward + ((block.number - user.lastReawardBlock) * pointsPerBlock * user.amount / vault.userAmount);
+            stakeWeight = 0;
         }
-        user.lastReawardBlock = block.number;
-        user.amount = user.amount + _amount;
-        user.lockTime = _lockTime; // TODO validar como ficará locktime quando houver segundo depósito, valerá o último?
-        
-        // console.log("After:  pointsPerBlock     %s, vault.userAmount    %s, user.reward             %s", pointsPerBlock, vault.userAmount, user.reward);
-        // console.log("After:  vault.amountReward %s, user.amount         %s, user.lastReawardBlock   %s", vault.amountReward, user.amount, user.lastReawardBlock);
 
-        emit Deposit(msg.sender, _vid, _amount);
+        userInvest[user.userInvestPos].amount += value;
+
+        TotalDay storage _totalDay = totalDay[_vid][_today];
+        if (!_totalDay.exists){
+            syncDays(_vid);
+        }
+        _totalDay.amount += value;
+        _totalDay.weight += stakeWeight;
+        // _totalDay.userInvest = userInvest;
+        vault.lastTotalDay = _today;
+        vault.usersAmount += value;
+
+        return true;
     }
 
-    function withdraw(uint256 _vid) public {
+    function today() internal view returns (uint) {
+        return block.timestamp.div(1 days);
+    }
+
+    function yestarday(uint _vid) internal view returns (uint) {
+        VaultInfo memory vault = vaultInfo[_vid];
+        return block.timestamp > vault.endVault
+            ? vault.endVault
+            : block.timestamp.div(1 days).sub(1);
+    }
+
+    function syncDays(uint _vid) public {
+        VaultInfo memory vault = vaultInfo[_vid];
+        uint _yesterday = yestarday(_vid);
+        uint _today = today();
+        //Valida se já foi calculado o último dia
+        if (vault.lastTotalDay >= _yesterday) {
+            return;
+        }
+
+        TotalDay memory _lastTotalDay = totalDay[_vid][vault.lastTotalDay];
+        //Atualiza dias que não tiveram depósito ou saque
+        for (uint d = vault.lastTotalDay + 1; d <= _today; d += 1) {
+            TotalDay storage _totalDay = totalDay[_vid][d];
+            _totalDay.amount = _lastTotalDay.amount;
+            _totalDay.weight = _lastTotalDay.weight;
+            _totalDay.exists = true;
+        }
+
+    }
+
+    function withdraw(uint _vid) public {
         VaultInfo storage vault = vaultInfo[_vid];
-        require(vault.created == true, "Vault not found");
         require(vault.paused == false, "Vault paused");
+        UserInfo storage user = userInfo[_vid][msg.sender];
+        require(user.lockTime <= block.timestamp, "User in lock time");
 
-        // UserInfo storage user = userInfo[_vid][msg.sender];
-        //require(user.lockTime >= vault.endBlockTime, "Vault paused");
+        syncDays(_vid);
+        uint userReward = calcRewardsUser(_vid, msg.sender);
+        user.lastRewardDay = today();
+        uint amount = userInvest[user.userInvestPos].amount;
+        user.rewardDebt += userReward;
+        uint total = amount + userReward;
 
-        // uint256 total = user.amount + user.rewardDebt;
+        require(vault.token.transfer(address(msg.sender), total));
 
-        // require(vault.token.transfer(address(msg.sender), total));
-
-        // console.log(vault.userCount);
+        user.rewardWithdraw = userReward;
+        user.exists = false;
+        
+        userInvest[user.userInvestPos].amount = 0;
+        userInvest[user.userInvestPos].weight = 0;
 
         vault.userCount = vault.userCount - 1;
-
-        delete userInfo[_vid][msg.sender];
+        vault.usersAmount -= amount;
     }
 
+    function calcRewardsUser(uint _vid, address _user) public view returns (uint) {
+        UserInfo memory user = userInfo[_vid][_user];
+        VaultInfo memory vault = vaultInfo[_vid];
+        uint _yesterday = yestarday(_vid);
+        uint reward = 0;
+        uint rewardDay = vault.amountReward.div(vault.lockDays);
+        uint weightedAverage = 0;
+        uint userWeight = userInvest[user.userInvestPos].weight;
+        for (uint d = user.lastRewardDay; d <= _yesterday; d += 1) {
+            TotalDay memory _totalDay = totalDay[_vid][d];
+            if (_totalDay.weight > 0) {
+                weightedAverage = _totalDay.amount.div(_totalDay.weight);
+                reward += rewardDay.mul(weightedAverage.mul(userWeight).mul(1e9).div(_totalDay.amount)).div(1e18);
+                // console.log("Dia %s", d);
+                // console.log("_totalDay.amount %s, _totalDay.weight %s, rewardDay %s",_totalDay.amount, _totalDay.weight, rewardDay.div(1e9));
+                // console.log(" weightedAverage %s, userWeight %s, reward %s", weightedAverage, userWeight, reward);
+                // console.log(" ");
+            }
+        }
+        return reward;
+    }
 }

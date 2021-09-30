@@ -1,15 +1,13 @@
 const { expect } = require('chai');
-// const {utils} = require('ethers');
-// const {isAddress} = require('ethers/lib/utils');
-// const { BigNumber } = require("ethereum-waffle");
 
 describe('Prepare Vault', () => {
     let Token, token, vault, Vault, owner, addr1, addr2;
-    let userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime
+    let userAmount, userWeight, userReward, userRewardWithdraw, userLockTime
     const typeToken = 1;
     const typeLP = 2;
-            
-  beforeEach(async () => {
+    const oneDay = 60 * 60 * 24;
+
+    beforeEach(async () => {
         Token = await ethers.getContractFactory('NoFeeToken');
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
         token = await Token.deploy(
@@ -17,7 +15,7 @@ describe('Prepare Vault', () => {
         );
 
         Vault = await ethers.getContractFactory('Vault');
-        vault = await Vault.deploy();
+        vault = await Vault.deploy(0);
 
         const bag = ethers.utils.parseUnits("250000", "gwei")
 
@@ -27,125 +25,166 @@ describe('Prepare Vault', () => {
 
 
     it('Create Vault', async () => {
-
-        let ownerBag = ethers.utils.parseUnits("1000", "gwei");
-
-        await token.approve(vault.address, ownerBag);
-
+        
+        let totalRewards = ethers.utils.parseUnits("1000", "gwei");
+        let vaultTotalDays = 30;
+        let rewardsPerDay = totalRewards / vaultTotalDays
+        
+        await token.approve(vault.address, totalRewards);
+        
         await vault.createVault(
             token.address,
             false,
-            100,
-            ownerBag
+            vaultTotalDays,
+            totalRewards
         );
 
-    describe('Validate rewards - Formula: ((block.number - user.lastReawardBlock) * pointsPerBlock * user.amount / vault.userAmount)', () => {
-
-            //Validate zero balance at beginning
-            // [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-            //     await vault.getUserVaultInfo(0, addr1.address);
-            // expect(await userAmount.to.equal(0));
-            
+        describe('Validate rewards', () => {
             const userBag = ethers.utils.parseUnits("100", "gwei");
-            
-            //await network.provider.send("evm_increaseTime", [3600])
-            
+
             it('Validate zero rewards after first deposit user', async () => {
                 await token.connect(addr1).approve(vault.address, userBag);
                 await vault.connect(addr1).deposit(
                     0,
-                    1632958826,
+                    29,
                     userBag,
                 );
 
-                [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-                    await vault.getUserVaultInfo(0, addr1.address);
-                expect(parseInt(await userReward)).to.be.equal(0);
+                [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+                    await vault.getUserInfo(0, addr1.address);
+                expect(parseInt(userReward)).to.be.equal(0);
             });
-            
-            it('Validate rewards after 10 blocks and new deposit of the user1', async () => {
-                const blockNum = await ethers.provider.getBlockNumber();
-                
-                for(var i=0; i<blockNum+10; i++) {
-                    await ethers.provider.send('evm_mine');
-                }
-                
+
+            let user1RewardDay1 = 0;
+            let user1RewardDay3 = 0;
+            let accUser1 = 0;
+            it('First user1 deposit after 5 days with weight 2', async () => {
+
+                await ethers.provider.send('evm_increaseTime', [oneDay * 5]);
+                await ethers.provider.send("evm_mine");
+                // console.log("startTimestamp %s", (await ethers.provider.getBlock()).timestamp);
+
                 await token.connect(addr1).approve(vault.address, userBag);
                 await vault.connect(addr1).deposit(
                     0,
-                    1632958826,
+                    29,
                     userBag,
                 );
-    
-                [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-                    await vault.getUserVaultInfo(0, addr1.address);
-                expect(parseInt(await userReward)).to.be.equal(10 * 9800000000);
+                accUser1 = accUser1 + userBag;
+
+                totalDay = await vault.totalDay(0,18899);
+                // console.log(String(totalDay));
+
+                await vault.syncDays(0);
+                // let userReward = await vault.calcRewardsUser(0, addr1.address);
+
+                // console.log(parseInt(userReward/100000000));
+                // expect(parseInt(userReward/1000000000)).to.be.equal(parseInt(rewardsPerDay * 10 / 1000000000));
             });
-            
-            it('Validate rewards after 2 blocks and new deposit of the user1', async () => {
-                await ethers.provider.send('evm_mine');
+
+            it('Second user1 deposit after 5 days with weight 2', async () => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 5]);
+                await ethers.provider.send("evm_mine");
                 await token.connect(addr1).approve(vault.address, userBag);
                 await vault.connect(addr1).deposit(
                     0,
-                    1632958826,
+                    30,
                     userBag,
-                    );
-                    
-                    [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-                    await vault.getUserVaultInfo(0, addr1.address);
-                    expect(parseInt(await userReward)).to.be.equal(10 * 9800000000 + 2 * 9800000000);
+                );
+                accUser1 = accUser1 + userBag;
+
+                await vault.syncDays(0);
+                // let userReward = await vault.calcRewardsUser(0, addr1.address);
+                
+                // console.log(parseInt(userReward/100000000));
+                // expect(parseInt(userReward/1000000000)).to.be.equal(parseInt(rewardsPerDay * 10 / 1000000000));
             });
-            
-            it('Validate zero rewards after 1 block and first deposit of the user2', async () => {
+
+            it('First user2 deposit after 5 days with weight 1', async () => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 5]);
                 await ethers.provider.send('evm_mine');
                 await token.connect(addr2).approve(vault.address, userBag);
                 await vault.connect(addr2).deposit(
                     0,
-                    1632958826,
+                    0,
                     userBag,
-                    );
-                    
-                    [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-                    await vault.getUserVaultInfo(0, addr2.address);
-                    expect(parseInt(await userReward)).to.be.equal(0);
-                });    
-                
-                // it('Validate rewards after 10 blocks and new deposit of the user2', async () => {
-                //     const blockNum = await ethers.provider.getBlockNumber();
-                    
-                //     for(var i=0; i<blockNum+10; i++) {
-                //         await ethers.provider.send('evm_mine');
-                //     }
-                    
-                //     await token.connect(addr1).approve(vault.address, userBag);
-                //     await vault.connect(addr1).deposit(
-                //         0,
-                //         1632958826,
-                //         userBag,
-                //     );
-        
-                //     [userAmount, userLastReawardBlock, userReward, userRewardWithdraw, userLockTime] = 
-                //         await vault.getUserVaultInfo(0, addr1.address);
-                //     expect(parseInt(await userReward)).to.be.equal(10 * 9800000000); // TODO buscar saldo total do Vault para calcular
-                // });
-                
-                // console.log('getUserVaultInfo:\n%s',
-                //     (await vault.getUserVaultInfo(0, addr1.address)).toString()
-                // );
-                
-                /*
-                console.log((await token.totalSupply()).toString());
-            console.log(parseInt(await token.balanceOf(addr1.address)));
-            console.log(parseInt(await token.balanceOf(addr2.address)));
-            console.log(parseInt(await token.balanceOf(owner.address)));
-            */
-            // console.log('before withdraw:%s', parseInt(await token.balanceOf(vault.address)));
+                );
 
-            // await vault.connect(addr1).withdraw(0);
+                await vault.syncDays(0);
+                // let userReward = await vault.calcRewardsUser(0, addr2.address);
+                
+                // console.log(parseInt(userReward/1000000000));
+                // expect(parseInt(userReward/1000000000)).to.be.equal(parseInt(rewardsPerDay * 10 / 1000000000));
+            });
 
-            // console.log('after withdraw:%s', parseInt(await token.balanceOf(vault.address)));
+            it('Second user2 deposit after 5 days with weight 1', async () => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 5]);
+                await ethers.provider.send('evm_mine');
+                await token.connect(addr2).approve(vault.address, userBag);
+                await vault.connect(addr2).deposit(
+                    0,
+                    0,
+                    userBag,
+                );
 
-         });
+                await vault.syncDays(0);
+                // let userReward = await vault.calcRewardsUser(0, addr2.address);
+                
+                // console.log(parseInt(userReward/1000000000));
+                // expect(parseInt(userReward/1000000000)).to.be.equal(parseInt(rewardsPerDay * 10 / 1000000000));
+            });
+
+            it('Third user2 deposit after 5 days with weight 1', async () => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 5]);
+                await ethers.provider.send('evm_mine');
+                await token.connect(addr2).approve(vault.address, userBag);
+                await vault.connect(addr2).deposit(
+                    0,
+                    0,
+                    userBag,
+                );
+
+                await vault.syncDays(0);
+                // let userReward = await vault.calcRewardsUser(0, addr2.address);
+                
+                // console.log(parseInt(userReward/1000000000));
+                // expect(parseInt(userReward/1000000000)).to.be.equal(parseInt(rewardsPerDay * 10 / 1000000000));
+            });
+
+            it('Validate rewards on the 29th day of the vault, after withdraw', async () => {
+                await ethers.provider.send('evm_increaseTime', [oneDay*4]);
+                await ethers.provider.send("evm_mine");
+                
+                await vault.syncDays(0);
+
+                await vault.connect(addr1).withdraw(0);
+                await vault.connect(addr2).withdraw(0);
+                
+                [userAmount, userWeight, userReward1, userRewardWithdraw, userLockTime] =
+                    await vault.getUserInfo(0, addr1.address);
+                
+                [userAmount, userWeight, userReward2, userRewardWithdraw, userLockTime] =
+                    await vault.getUserInfo(0, addr2.address);
+                
+                // console.log(parseInt(userReward1));
+                // console.log(parseInt(userReward2));
+                expect(userReward1).to.be.equal(719);
+                expect(userReward2).to.be.equal(224);
+            });
+
+            // it('Validate zero rewards after 1 block and first deposit of the user2', async () => {
+            //     await ethers.provider.send('evm_mine');
+            //     await token.connect(addr2).approve(vault.address, userBag);
+            //     await vault.connect(addr2).deposit(
+            //         0,
+            //         timestamp + (60*60*24)*30, //atual + 30 dias,
+            //         userBag,
+            //     );
+
+            //     [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+            //         await vault.getUserInfo(0, addr2.address);
+            //     expect(parseInt(await userReward)).to.be.equal(0);
+            // });
+        });
     });
-
 });
