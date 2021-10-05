@@ -97,10 +97,9 @@ contract Vault is Ownable {
     
     function withdrawTax(uint _vid) public onlyOwner {
         VaultInfo storage vault = vaultInfo[_vid];
-        if (vault.vaultTokenTax > 0) {
-            require(vault.token.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
-            vault.vaultTokenTax = 0;
-        }
+        require(vault.vaultTokenTax > 0, "Vault without token tax left");
+        require(vault.token.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
+        vault.vaultTokenTax = 0;
     }
 
     function isBabyDoge(IERC20 _token) internal view returns (bool) {
