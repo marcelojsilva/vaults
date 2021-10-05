@@ -60,7 +60,7 @@ contract Vault is Ownable {
         bool _isLp,
         uint _lockDays,
         uint _amount
-    ) public {
+    ) public returns (uint) {
         require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
         uint tax = 0;
         if (!isBabyDoge(_token)) {
@@ -93,6 +93,8 @@ contract Vault is Ownable {
             _token.transferFrom(address(msg.sender), address(this), _amount),
             "Can't transfer tokens."
         );
+
+        return vaultId;
     }
     
     function withdrawTax(uint _vid) public onlyOwner {
