@@ -216,8 +216,8 @@
       ]
     },
     "D:\\mjs\\MJNote\\git\\babydoge-defi\\vaults\\contracts\\Vault.sol": {
-      "lastModificationDate": 1633312709521,
-      "contentHash": "9d04ee7f4076afa16bafb5d75a449d02",
+      "lastModificationDate": 1633463615113,
+      "contentHash": "11ae157c0254624e9c97fe3d6c1c0458",
       "sourceName": "contracts/Vault.sol",
       "solcConfig": {
         "version": "0.8.0",

@@ -11,7 +11,8 @@ contract Vault is Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
-    uint public taxForNonBabyDogeCoin = 0;
+    uint public taxForNonBabyDogeCoin;
+    IERC20 public babydoge;
 
     struct UserInfo {
         uint amount;
@@ -46,12 +47,11 @@ contract Vault is Ownable {
     }
     VaultInfo[] public vaultInfo;
 
-    //address public babydogeAddr = 0xc748673057861a797275cd8a068abb95a902e8de;
-
     event Deposit(address indexed user, uint indexed pid, uint amount);
     event Withdraw(address indexed user, uint indexed pid, uint amount);
 
-    constructor(uint _taxForNonBabyDogeCoin) {
+    constructor(IERC20 _babydoge, uint _taxForNonBabyDogeCoin) {
+        babydoge = _babydoge;
         taxForNonBabyDogeCoin = _taxForNonBabyDogeCoin;
     }
 
@@ -60,12 +60,14 @@ contract Vault is Ownable {
         bool _isLp,
         uint _lockDays,
         uint _amount
-    ) public {
+    ) public returns (uint) {
         require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
-        //TODO validate tax free for babydoge
-        uint _amountReserve = (_amount / 100) *
-            (100 - taxForNonBabyDogeCoin);
-        uint _tax = (_amount / 100) * taxForNonBabyDogeCoin;
+        uint tax = 0;
+        if (!isBabyDoge(_token)) {
+            tax = taxForNonBabyDogeCoin;
+        }
+        uint _amountReserve = (_amount / 100) * (100 - tax);
+        uint _tax = (_amount / 100) * tax;
         
         vaultInfo.push(
             VaultInfo({
@@ -91,6 +93,19 @@ contract Vault is Ownable {
             _token.transferFrom(address(msg.sender), address(this), _amount),
             "Can't transfer tokens."
         );
+
+        return vaultId;
+    }
+    
+    function withdrawTax(uint _vid) public onlyOwner {
+        VaultInfo storage vault = vaultInfo[_vid];
+        require(vault.vaultTokenTax > 0, "Vault without token tax left");
+        require(vault.token.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
+        vault.vaultTokenTax = 0;
+    }
+
+    function isBabyDoge(IERC20 _token) internal view returns (bool) {
+        return address(_token) == address(babydoge);
     }
 
     function getUserInfo(uint _vid, address _user)

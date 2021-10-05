@@ -17,9 +17,9 @@ describe('Prepare Vault', () => {
         token = await Token.deploy(
             'test', 'TESTX', supply*gwei
         );
-
         Vault = await ethers.getContractFactory('Vault');
-        vault = await Vault.deploy(0);
+        //Pass BabyDoge´s address token on deploy of the Vault
+        vault = await Vault.deploy(token.address, 2);
 
         token.transfer(addr1.address, bag);
         token.transfer(addr2.address, bag);
