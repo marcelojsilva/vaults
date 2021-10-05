@@ -4,53 +4,53 @@ pragma solidity 0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
-import "./SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
-    using SafeMath for uint;
+    using SafeMath for uint256;
 
-    uint public taxForNonBabyDogeCoin;
+    uint256 public taxForNonBabyDogeCoin;
     IERC20 public babydoge;
 
     struct UserInfo {
-        uint amount;
-        uint weight;
-        uint rewardDebt;
-        uint rewardWithdraw;
-        uint lockTime;
-        uint lockDays;
-        uint lastRewardDay;
+        uint256 amount;
+        uint256 weight;
+        uint256 rewardDebt;
+        uint256 rewardWithdraw;
+        uint256 lockTime;
+        uint256 lockDays;
+        uint256 lastRewardDay;
         bool exists;
     }
-    mapping(uint => mapping(address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
     struct TotalDay {
-        uint amount;
-        uint weight;
+        uint256 amount;
+        uint256 weight;
     }
-    mapping(uint => mapping(uint => TotalDay)) public totalDay;
+    mapping(uint256 => mapping(uint256 => TotalDay)) public totalDay;
 
     struct VaultInfo {
         IERC20 token;
-        uint amountReward;
-        uint vaultTokenTax;
-        uint startVault;
-        uint lockDays;
-        uint userCount;
-        uint usersAmount;
-        uint usersWeight;
+        uint256 amountReward;
+        uint256 vaultTokenTax;
+        uint256 startVault;
+        uint256 lockDays;
+        uint256 userCount;
+        uint256 usersAmount;
+        uint256 usersWeight;
         bool isLpVault;
         bool paused;
-        uint lastTotalDay;
+        uint256 lastTotalDay;
     }
     VaultInfo[] public vaultInfo;
 
-    event Deposit(address indexed user, uint indexed pid, uint amount);
-    event Withdraw(address indexed user, uint indexed pid, uint amount);
+    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
+    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    constructor(IERC20 _babydoge, uint _taxForNonBabyDogeCoin) {
+    constructor(IERC20 _babydoge, uint256 _taxForNonBabyDogeCoin) {
         babydoge = _babydoge;
         taxForNonBabyDogeCoin = _taxForNonBabyDogeCoin;
     }
@@ -58,16 +58,16 @@ contract Vault is Ownable {
     function createVault(
         IERC20 _token,
         bool _isLp,
-        uint _lockDays,
-        uint _amount
-    ) public returns (uint) {
+        uint256 _lockDays,
+        uint256 _amount
+    ) public returns (uint256) {
         require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
-        uint tax = 0;
+        uint256 tax = 0;
         if (!isBabyDoge(_token)) {
             tax = taxForNonBabyDogeCoin;
         }
-        uint _amountReserve = (_amount / 100) * (100 - tax);
-        uint _tax = (_amount / 100) * tax;
+        uint256 _amountReserve = (_amount / 100) * (100 - tax);
+        uint256 _tax = (_amount / 100) * tax;
         
         vaultInfo.push(
             VaultInfo({
@@ -84,8 +84,8 @@ contract Vault is Ownable {
                 lastTotalDay: block.timestamp.div(1 days).sub(1)
             })
         );
-        uint vaultId = vaultInfo.length - 1;
-        uint _today = today();
+        uint256 vaultId = vaultInfo.length - 1;
+        uint256 _today = today();
         TotalDay storage _totalDay = totalDay[vaultId][_today];
         _totalDay.amount = 0;
 
@@ -97,7 +97,7 @@ contract Vault is Ownable {
         return vaultId;
     }
     
-    function withdrawTax(uint _vid) public onlyOwner {
+    function withdrawTax(uint256 _vid) public onlyOwner {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.vaultTokenTax > 0, "Vault without token tax left");
         require(vault.token.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
@@ -108,14 +108,14 @@ contract Vault is Ownable {
         return address(_token) == address(babydoge);
     }
 
-    function getUserInfo(uint _vid, address _user)
+    function getUserInfo(uint256 _vid, address _user)
         public view 
         returns (
-            uint,
-            uint,
-            uint,
-            uint,
-            uint
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256
         )
     {
         UserInfo memory user = userInfo[_vid][_user];
@@ -128,7 +128,7 @@ contract Vault is Ownable {
         );
     }
 
-    function getVault(uint _vid) public view returns (IERC20, uint, uint, uint, uint, uint){
+    function getVault(uint256 _vid) public view returns (IERC20, uint256, uint256, uint256, uint256, uint256){
         VaultInfo memory vault = vaultInfo[_vid];
         return (
             vault.token,
@@ -140,26 +140,26 @@ contract Vault is Ownable {
         );
     }
 
-    function endVaultDay(uint _vid) internal view returns (uint) {
+    function endVaultDay(uint256 _vid) internal view returns (uint256) {
         VaultInfo memory vault = vaultInfo[_vid];
         return vault.startVault.add(vault.lockDays * 24 * 60 * 60);
     }
 
-    function today() internal view returns (uint) {
+    function today() internal view returns (uint256) {
         return block.timestamp.div(1 days);
     }
 
-    function yestarday(uint _vid) internal view returns (uint) {
-        uint endVault = endVaultDay(_vid);
+    function yestarday(uint256 _vid) internal view returns (uint256) {
+        uint256 endVault = endVaultDay(_vid);
         return block.timestamp > endVault
             ? endVault.div(1 days).sub(1)
             : block.timestamp.div(1 days).sub(1);
     }
 
-    function syncDays(uint _vid) internal {
+    function syncDays(uint256 _vid) internal {
         VaultInfo memory vault = vaultInfo[_vid];
-        uint _yesterday = yestarday(_vid);
-        uint _today = today();
+        uint256 _yesterday = yestarday(_vid);
+        uint256 _today = today();
         //Return if already sync
         if (vault.lastTotalDay >= _yesterday) {
             return;
@@ -167,7 +167,7 @@ contract Vault is Ownable {
 
         TotalDay memory _lastTotalDay = totalDay[_vid][vault.lastTotalDay];
         //Sync days without movements
-        for (uint d = vault.lastTotalDay + 1; d < _today; d += 1) {
+        for (uint256 d = vault.lastTotalDay + 1; d < _today; d += 1) {
             TotalDay storage _totalDay = totalDay[_vid][d];
             _totalDay.amount = _lastTotalDay.amount;
             _totalDay.weight = _lastTotalDay.weight;
@@ -175,26 +175,26 @@ contract Vault is Ownable {
     }
 
     function deposit(
-        uint _vid,
-        uint _lockDays,
-        uint value
+        uint256 _vid,
+        uint256 _lockDays,
+        uint256 value
     ) external returns (bool) {
         require(value > 0, "Deposit must be greater than zero");
         VaultInfo storage vault = vaultInfo[_vid];
-        uint endVault = endVaultDay(_vid);
+        uint256 endVault = endVaultDay(_vid);
         require(vault.paused == false, "Vault paused");
         require(block.timestamp >= vault.startVault, "Vault not started");
         require(block.timestamp <= endVault, "Vault finiched");
         require(
             vault.token.transferFrom(address(msg.sender), address(this), value)
         );
-        uint _today = today();
+        uint256 _today = today();
 
         UserInfo storage user = userInfo[_vid][msg.sender];
-        uint stakeWeight = 0;
+        uint256 stakeWeight = 0;
         if (!user.exists) {
             user.exists = true;
-            uint _lockTime = block.timestamp.add(_lockDays*24*60*60);
+            uint256 _lockTime = block.timestamp.add(_lockDays*24*60*60);
             _lockTime = _lockTime > endVault
                 ? endVault 
                 : _lockTime;
@@ -226,7 +226,7 @@ contract Vault is Ownable {
         return true;
     }
 
-    function withdraw(uint _vid) public {
+    function withdraw(uint256 _vid) public {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.paused == false, "Vault paused");
         UserInfo storage user = userInfo[_vid][msg.sender];
@@ -234,13 +234,13 @@ contract Vault is Ownable {
         
         syncDays(_vid);
 
-        uint _today = today();
+        uint256 _today = today();
 
-        uint userReward = calcRewardsUser(_vid, msg.sender);
+        uint256 userReward = calcRewardsUser(_vid, msg.sender);
         
         user.lastRewardDay = _today;
         user.rewardDebt += userReward;
-        uint total = user.amount + userReward;
+        uint256 total = user.amount + userReward;
 
         require(vault.token.transfer(address(msg.sender), total));
 
@@ -260,24 +260,19 @@ contract Vault is Ownable {
         user.weight = 0;
     }
 
-    function calcRewardsUser(uint _vid, address _user) public view returns (uint) {
+    function calcRewardsUser(uint256 _vid, address _user) public view returns (uint256) {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
-        uint _yesterday = yestarday(_vid);
-        uint reward = 0;
-        uint rewardDay = vault.amountReward.div(vault.lockDays);
-        uint weightedAverage = 0;
-        uint userWeight = user.weight;
-        for (uint d = user.lastRewardDay; d <= _yesterday; d += 1) {
+        uint256 _yesterday = yestarday(_vid);
+        uint256 reward = 0;
+        uint256 rewardDay = vault.amountReward.div(vault.lockDays);
+        uint256 weightedAverage = 0;
+        uint256 userWeight = user.weight;
+        for (uint256 d = user.lastRewardDay; d <= _yesterday; d += 1) {
             TotalDay memory _totalDay = totalDay[_vid][d];
             if (_totalDay.weight > 0) {
                 weightedAverage = _totalDay.amount.div(_totalDay.weight);
                 reward += rewardDay.mul(weightedAverage.mul(userWeight).mul(1e9).div(_totalDay.amount)).div(1e9);
-                // console.log("Dia %s user %", d, msg.sender);
-                // console.log("_totalDay.amount %s, _totalDay.weight %s, rewardDay %s",_totalDay.amount, _totalDay.weight, rewardDay.div(1e9));
-                // console.log(" weightedAverage %s, userWeight %s, reward %s", weightedAverage, userWeight, reward);
-                // console.log("% %s", weightedAverage.mul(userWeight).mul(1e9).div(_totalDay.amount));
-                // console.log(" ");
             }
         }
         return reward;
