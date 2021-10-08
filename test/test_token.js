@@ -35,6 +35,7 @@ describe('Prepare Vault', () => {
 
         await vault.createVault(
             token.address,
+            token.address,
             false,
             vaultTotalDays,
             totalRewards
