@@ -63,9 +63,11 @@ contract Vault is Ownable {
         uint256 _lockDays,
         uint256 _amount
     ) public returns (uint256) {
+
         require(_tokenStake.balanceOf(msg.sender) >= _amount, "User has no tokens");
         uint256 tax = 0;
         if (!isBabyDoge(_tokenStake)) {
+
             tax = taxForNonBabyDogeCoin;
         }
         uint256 _amountReserve = (_amount / 100) * (100 - tax);
