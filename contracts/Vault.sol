@@ -33,7 +33,8 @@ contract Vault is Ownable {
     mapping(uint256 => mapping(uint256 => TotalDay)) public totalDay;
 
     struct VaultInfo {
-        IERC20 token;
+        IERC20 tokenStake;
+        IERC20 tokenReward;
         uint256 amountReward;
         uint256 vaultTokenTax;
         uint256 startVault;
@@ -56,14 +57,17 @@ contract Vault is Ownable {
     }
 
     function createVault(
-        IERC20 _token,
+        IERC20 _tokenStake,
+        IERC20 _tokenReward,
         bool _isLp,
         uint256 _lockDays,
         uint256 _amount
     ) public returns (uint256) {
-        require(_token.balanceOf(msg.sender) >= _amount, "User has no tokens");
+
+        require(_tokenStake.balanceOf(msg.sender) >= _amount, "User has no tokens");
         uint256 tax = 0;
-        if (!isBabyDoge(_token)) {
+        if (!isBabyDoge(_tokenStake)) {
+
             tax = taxForNonBabyDogeCoin;
         }
         uint256 _amountReserve = (_amount / 100) * (100 - tax);
@@ -71,7 +75,8 @@ contract Vault is Ownable {
         
         vaultInfo.push(
             VaultInfo({
-                token: _token,
+                tokenStake: _tokenStake,
+                tokenReward: _tokenReward,
                 amountReward: _amountReserve,
                 vaultTokenTax: _tax,
                 startVault: block.timestamp,
@@ -90,18 +95,11 @@ contract Vault is Ownable {
         _totalDay.amount = 0;
 
         require(
-            _token.transferFrom(address(msg.sender), address(this), _amount),
+            _tokenReward.transferFrom(address(msg.sender), address(this), _amount),
             "Can't transfer tokens."
         );
 
         return vaultId;
-    }
-    
-    function withdrawTax(uint256 _vid) public onlyOwner {
-        VaultInfo storage vault = vaultInfo[_vid];
-        require(vault.vaultTokenTax > 0, "Vault without token tax left");
-        require(vault.token.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
-        vault.vaultTokenTax = 0;
     }
 
     function isBabyDoge(IERC20 _token) internal view returns (bool) {
@@ -128,10 +126,11 @@ contract Vault is Ownable {
         );
     }
 
-    function getVault(uint256 _vid) public view returns (IERC20, uint256, uint256, uint256, uint256, uint256){
+    function getVault(uint256 _vid) public view returns (IERC20, IERC20, uint256, uint256, uint256, uint256, uint256){
         VaultInfo memory vault = vaultInfo[_vid];
         return (
-            vault.token,
+            vault.tokenStake,
+            vault.tokenReward,
             vault.amountReward,
             vault.vaultTokenTax,
             vault.lockDays,
@@ -186,7 +185,7 @@ contract Vault is Ownable {
         require(block.timestamp >= vault.startVault, "Vault not started");
         require(block.timestamp <= endVault, "Vault finiched");
         require(
-            vault.token.transferFrom(address(msg.sender), address(this), value)
+            vault.tokenStake.transferFrom(address(msg.sender), address(this), value)
         );
         uint256 _today = today();
 
@@ -240,9 +239,9 @@ contract Vault is Ownable {
         
         user.lastRewardDay = _today;
         user.rewardDebt += userReward;
-        uint256 total = user.amount + userReward;
 
-        require(vault.token.transfer(address(msg.sender), total));
+        require(vault.tokenStake.transfer(address(msg.sender), user.amount));
+        require(vault.tokenReward.transfer(address(msg.sender), userReward));
 
         user.rewardWithdraw = userReward;
         user.exists = false;
@@ -258,6 +257,13 @@ contract Vault is Ownable {
 
         user.amount = 0;
         user.weight = 0;
+    }
+    
+    function withdrawTax(uint256 _vid) public onlyOwner {
+        VaultInfo storage vault = vaultInfo[_vid];
+        require(vault.vaultTokenTax > 0, "Vault without token tax left");
+        require(vault.tokenReward.transfer(owner(), vault.vaultTokenTax), "Can't transfer tax to owner");
+        vault.vaultTokenTax = 0;
     }
 
     function calcRewardsUser(uint256 _vid, address _user) public view returns (uint256) {
