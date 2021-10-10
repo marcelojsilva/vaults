@@ -23,6 +23,7 @@ module.exports = {
         }
     },
     gasReporter: {
+        enabled: (process.env.REPORT_GAS) ? true : false,
         currency: 'USD',
         gasPrice: 40
     },
