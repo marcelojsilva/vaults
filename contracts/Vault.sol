@@ -224,7 +224,7 @@ contract Vault is Ownable {
         return true;
     }
 
-    function claimRewards(uint256 _vid, uint256 _value) public {
+    function claimRewards(uint256 _vid) public {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.paused == false, "Vault paused");
         UserInfo storage user = userInfo[_vid][msg.sender];
@@ -240,11 +240,11 @@ contract Vault is Ownable {
         user.rewardTotal += userReward;
         uint256 remainingReward = user.rewardTotal.sub(user.rewardWithdraw);
 
-        require(_value <= remainingReward, "Value claimed greater than user rewards");
+        require(remainingReward > 0, "No value to claim");
 
-        require(vault.tokenReward.transfer(address(msg.sender), _value));
+        require(vault.tokenReward.transfer(address(msg.sender), remainingReward));
 
-        user.rewardWithdraw += _value;
+        user.rewardWithdraw += remainingReward;
     }
 
     function withdraw(uint256 _vid) public {

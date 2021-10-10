@@ -102,9 +102,7 @@ describe('Prepare Vault', () => {
             });
 
             it('User1 claim and reinvest reward on 7th day', async () => {
-                userReward = await vault.calcRewardsUser(0, addr1.address);
-                
-                await vault.connect(addr1).claimRewards(0, userReward);
+                await vault.connect(addr1).claimRewards(0);
                 
                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
                     await vault.getUserInfo(0, addr1.address);
