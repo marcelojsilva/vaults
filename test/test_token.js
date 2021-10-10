@@ -101,13 +101,27 @@ describe('Prepare Vault', () => {
                 expect(userReward3).to.be.equal(227);
             });
 
-            it('Whithdraw after 1 day of user2 with weight 1.1 and user3 with weight 1', async () => {
-                await token.connect(addr1).approve(vault.address, userBag);
+            it('User1 claim and reinvest reward on 7th day', async () => {
+                userReward = await vault.calcRewardsUser(0, addr1.address);
+                
+                await vault.connect(addr1).claimRewards(0, userReward);
+                
+                [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+                    await vault.getUserInfo(0, addr1.address);
+                userReward1 = parseInt(userReward / gwei);
+                userRewardWithdraw = parseInt(userRewardWithdraw / gwei);
+ 
+                expect(userReward1).to.be.equal(userRewardWithdraw);
+
+                await token.connect(addr1).approve(vault.address, userRewardWithdraw);
                 await vault.connect(addr1).deposit(
                     0,
                     0,
-                    userBag,
+                    userRewardWithdraw,
                 );
+            });
+
+            it('Whithdraw after 1 day of user2 with weight 1.1 and user3 with weight 1', async () => {
                 await token.connect(addr2).approve(vault.address, userBag);
                 await vault.connect(addr2).deposit(
                     0,
@@ -147,7 +161,7 @@ describe('Prepare Vault', () => {
                     await vault.getUserInfo(0, addr1.address);
                 userReward1 = parseInt(userReward / gwei);
                 
-                expect(userReward1).to.be.equal(407);
+                expect(userReward1).to.be.equal(406);
             });
 
             it('Total rewards achieved', async () => {
