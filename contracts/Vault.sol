@@ -228,7 +228,6 @@ contract Vault is Ownable {
         VaultInfo storage vault = vaultInfo[_vid];
         require(vault.paused == false, "Vault paused");
         UserInfo storage user = userInfo[_vid][msg.sender];
-        require(user.lockTime <= block.timestamp, "User in lock time");
         
         syncDays(_vid);
 
