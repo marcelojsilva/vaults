@@ -74,6 +74,7 @@ contract Vault is Ownable {
         uint256 _minLockDays,
         uint256 _amount
     ) public returns (uint256) {
+        require(vaultKeys[key] == 0, "Vault Key Already used");
         require(
             _tokenStake.balanceOf(msg.sender) >= _amount,
             "User has no tokens"

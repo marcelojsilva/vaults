@@ -18,7 +18,7 @@ module.exports = {
     networks: {
         hardhat: {
             // allowUnlimitedContractSize: true
-            blockGasLimit: 60000000,
+            blockGasLimit: 4000000000,
             gasPrice: 4000000000
         }
     },
@@ -48,5 +48,8 @@ module.exports = {
                 version: "0.8.0",
             },
         ],
-    }
+    },
+    mocha: {
+    timeout: 50000
+  }
 };
