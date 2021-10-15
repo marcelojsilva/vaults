@@ -24,6 +24,7 @@ contract Vault is Ownable {
         bool exists;
     }
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(uint256 => uint256) public vaultKeys;
 
     struct TotalDay {
         uint256 amount;
@@ -56,12 +57,16 @@ contract Vault is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    constructor(IERC20 _babydoge, uint256 _taxForNonBabyDogeCoin) {
+    constructor(IERC20 _babydoge) {
         babydoge = _babydoge;
+    }
+
+    function setTaxForNonBabyDogeCoin(uint256 _taxForNonBabyDogeCoin) onlyOwner {
         taxForNonBabyDogeCoin = _taxForNonBabyDogeCoin;
     }
 
     function createVault(
+        uint256 key,
         IERC20 _tokenStake,
         IERC20 _tokenReward,
         bool _isLp,
@@ -107,6 +112,9 @@ contract Vault is Ownable {
         vaultInfo.push(vault);
 
         uint256 vaultId = vaultInfo.length - 1;
+
+        vaultKeys[key] = vaultId;
+
         uint256 _today = today();
         TotalDay storage _totalDay = totalDay[vaultId][_today];
         _totalDay.amount = 0;
@@ -120,6 +128,10 @@ contract Vault is Ownable {
         );
 
         return vaultId;
+    }
+
+    function getVaultId(uint256 key) public view returns (uint256) {
+        return vaultKeys[key];
     }
 
     function isBabyDoge(IERC20 _token) internal view returns (bool) {
