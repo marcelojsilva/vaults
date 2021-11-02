@@ -20,22 +20,22 @@ describe('Prepare Vault', () => {
         );
         VaultContract = await ethers.getContractFactory('Vault');
         //Pass BabyDoge´s address token on deploy of the Vault
-        vaults = await VaultContract.deploy(token.address, 2);
+        vaults = await VaultContract.deploy(token.address);
 
         token.transfer(addr1.address, bag);
         token.transfer(addr2.address, bag);
         token.transfer(addr3.address, bag);
     });
 
-    /*
 
-    it('Create Vault 0 for 10 days', async() => {
-
-        let vault0TotalDays = 10;
+    it('Create Vault 0 for 10 days and Vault 1 for 100 days', async() => {
 
         await token.approve(vaults.address, totalVault0Rewards);
 
+        let vault0TotalDays = 10;
+
         await vaults.createVault(
+            111,
             token.address,
             token.address,
             false,
@@ -43,6 +43,11 @@ describe('Prepare Vault', () => {
             0,
             totalVault0Rewards
         );
+
+        let vault1TotalDays = 100;
+
+        await token.approve(vaults.address, totalVault1Rewards);
+
         describe('Valid deposits', () => {
             it('Validate non zero deposit', async() => {
                 await token.connect(addr1).approve(vaults.address, vault0);
@@ -54,10 +59,10 @@ describe('Prepare Vault', () => {
             });
         });
 
-        describe('Validate rewards  Vault 0', () => {
-            const userBag = 100 * gwei;
+        describe('Validate rewards of Vaults', async() => {
+            var userBag = 100 * gwei;
 
-            it('Validate zero rewards after first deposit user', async() => {
+            it('Validate zero rewards after first deposit user at Vault 0', async() => {
                 await token.connect(addr1).approve(vaults.address, userBag);
                 await vaults.connect(addr1).deposit(
                     vault0,
@@ -70,7 +75,7 @@ describe('Prepare Vault', () => {
                 expect(parseInt(userReward)).to.be.equal(0);
             });
 
-            it('Whithdraw after 7 day of user2 with weight 1.7 and user3 with weight 1.3', async() => {
+            it('Whithdraw after 7 day of user2 with weight 1.7 and user3 with weight 1.3 at Vault 0', async() => {
                 await ethers.provider.send('evm_increaseTime', [oneDay]);
                 await ethers.provider.send("evm_mine");
                 await token.connect(addr2).approve(vaults.address, userBag);
@@ -89,8 +94,8 @@ describe('Prepare Vault', () => {
                 await ethers.provider.send('evm_increaseTime', [oneDay * 7]);
                 await ethers.provider.send("evm_mine");
 
-                await vaults.connect(addr2).withdraw(vault0);
-                await vaults.connect(addr3).withdraw(vault0);
+                await vaults.connect(addr2).withdraw(vault0, userBag);
+                await vaults.connect(addr3).withdraw(vault0, userBag);
 
                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
                 await vaults.getUserInfo(vault0, addr2.address);
@@ -103,7 +108,7 @@ describe('Prepare Vault', () => {
                 expect(userReward3).to.be.equal(227);
             });
 
-            it('User1 claim and reinvest reward on 7th day', async() => {
+            it('User1 claim and reinvest reward on 7th day at Vault 0', async() => {
                 await vaults.connect(addr1).claimRewards(vault0);
 
                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
@@ -121,7 +126,7 @@ describe('Prepare Vault', () => {
                 );
             });
 
-            it('Whithdraw after 1 day of user2 with weight 1.1 and user3 with weight 1', async() => {
+            it('Whithdraw after 1 day of user2 with weight 1.1 and user3 with weight 1 at Vault 0', async() => {
                 await token.connect(addr2).approve(vaults.address, userBag);
                 await vaults.connect(addr2).deposit(
                     vault0,
@@ -138,8 +143,8 @@ describe('Prepare Vault', () => {
                 await ethers.provider.send('evm_increaseTime', [oneDay * 1]);
                 await ethers.provider.send("evm_mine");
 
-                await vaults.connect(addr2).withdraw(vault0);
-                await vaults.connect(addr3).withdraw(vault0);
+                await vaults.connect(addr2).withdraw(vault0, userBag);
+                await vaults.connect(addr3).withdraw(vault0, userBag);
 
                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
                 await vaults.getUserInfo(vault0, addr2.address);
@@ -152,104 +157,78 @@ describe('Prepare Vault', () => {
                 expect(userReward3).to.be.equal(227 + 32);
             });
 
-            it('Withdrawal of the user1 of all 10 days invested with weight 1', async() => {
-                await ethers.provider.send('evm_increaseTime', [oneDay * 2]);
+            it('Withdrawal of the user1 of all 10 days invested with weight 1 at Vault 0', async() => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 1]);
                 await ethers.provider.send("evm_mine");
-                await vaults.connect(addr1).withdraw(0);
+                await vaults.connect(addr1).withdraw(vault0, userBag);
 
                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
                 await vaults.getUserInfo(vault0, addr1.address);
                 userReward1 = parseInt(userReward / gwei);
 
-                expect(userReward1).to.be.equal(406);
+                expect(userReward1).to.be.equal(407);
             });
 
-            it('Total rewards achieved', async() => {
+            it('Total rewards achieved at Vault 0', async() => {
                 userReward = (userReward1 + userReward2 + userReward3) * gwei;
                 expect(userReward).to.be.lessThanOrEqual(totalVault0Rewards);
                 expect(userReward).to.be.greaterThanOrEqual(parseInt(totalVault0Rewards * 0.9));
             });
+
+            userBag = 10000 * gwei;
+
+            const ret = await vaults.createVault(
+                231,
+                token.address,
+                token.address,
+                false,
+                vault1TotalDays,
+                20,
+                totalVault1Rewards
+            );
+
+            it('User1 deposit 10k for 20 days and User2 deposti 10k for 40 days on the first day of the Vault 1', async() => {
+                await token.connect(addr1).approve(vaults.address, userBag);
+                await vaults.connect(addr1).deposit(
+                    vault1,
+                    20,
+                    userBag,
+                );
+                await token.connect(addr2).approve(vaults.address, userBag);
+                await vaults.connect(addr2).deposit(
+                    vault1,
+                    40,
+                    userBag,
+                );
+
+                [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+                await vaults.getUserInfo(vault1, addr1.address);
+                expect(parseInt(userReward)).to.be.equal(0);
+            });
+
+            it('User1 and User2 Withdraw after 100 days at Vault 1', async() => {
+                await ethers.provider.send('evm_increaseTime', [oneDay * 100]);
+                await ethers.provider.send("evm_mine");
+
+                await vaults.connect(addr1).withdraw(vault1, userBag);
+                await vaults.connect(addr2).withdraw(vault1, userBag);
+                [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+                await vaults.getUserInfo(vault1, addr1.address);
+                userReward1 = parseInt(userReward / gwei);
+
+                [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
+                await vaults.getUserInfo(vault1, addr2.address);
+                userReward2 = parseInt(userReward / gwei);
+
+                expect(userReward1).to.be.equal(46152);
+                expect(userReward2).to.be.equal(53844);
+            });
+
+            it('Total rewards achieved at Vault 1', async() => {
+                userReward = (userReward1 + userReward2) * gwei;
+                expect(userReward).to.be.lessThanOrEqual(totalVault1Rewards);
+                expect(userReward).to.be.greaterThanOrEqual(parseInt(totalVault1Rewards * 0.9));
+            });
         });
-    });*/
-
-     it('Create Vault 1 for 100 days', async() => {
-
-         let vault1TotalDays = 100;
-
-         await token.approve(vaults.address, (totalVault1Rewards * 2));
-           let response1 = await vaults.createVault(
-             111,
-             token.address,
-             token.address,
-             false,
-             vault1TotalDays,
-             20,
-             totalVault1Rewards
-         )
-
-         let response = await vaults.createVault(
-             231,
-             token.address,
-             token.address,
-             false,
-             vault1TotalDays,
-             20,
-             totalVault1Rewards
-         )
-
-
-         let testx = await vaults.getVaultId(111);
-         let test1 = await vaults.getVaultId(231);
-         console.log(testx.toString())
-         console.log(test1.toString())
-
-
-         describe('Validate rewards Vault 1', () => {
-             const userBag = 10000 * gwei;
-
-             it('User1 deposit 10k for 20 days and User2 deposti 10k for 40 days on the first day of the Vault 1', async() => {
-                 await token.connect(addr1).approve(vaults.address, userBag);
-                 await vaults.connect(addr1).deposit(
-                     vault1,
-                     20,
-                     userBag,
-                 );
-                 await token.connect(addr2).approve(vaults.address, userBag);
-                 await vaults.connect(addr2).deposit(
-                     vault1,
-                     40,
-                     userBag,
-                 );
-
-                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
-                 await vaults.getUserInfo(1, addr1.address);
-                 expect(parseInt(userReward)).to.be.equal(0);
-             });
-
-             /*
-             it('User1 and User2 Withdraw after 100 days on the Vault 1', async() => {
-                 await ethers.provider.send('evm_increaseTime', [oneDay * 100]);
-                 await ethers.provider.send("evm_mine");
-
-                 await vaults.connect(addr1).withdraw(vault1);
-                 await vaults.connect(addr2).withdraw(vault1);
-                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
-                 await vaults.getUserInfo(vault1, addr1.address);
-                 userReward1 = parseInt(userReward / gwei);
-
-                 [userAmount, userWeight, userReward, userRewardWithdraw, userLockTime] =
-                 await vaults.getUserInfo(vault1, addr2.address);
-                 userReward2 = parseInt(userReward / gwei);
-
-                 expect(userReward1).to.be.equal(46152);
-                 expect(userReward2).to.be.equal(53844);
-             });
-
-             it('Total rewards achieved on Vault 1', async() => {
-                 userReward = (userReward1 + userReward2) * gwei;
-                 expect(userReward).to.be.lessThanOrEqual(totalVault1Rewards);
-                 expect(userReward).to.be.greaterThanOrEqual(parseInt(totalVault1Rewards * 0.9));
-             });*/
-         });
-     });
+    });
 });
