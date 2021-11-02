@@ -6,7 +6,7 @@
       "contentHash": "68faf6c1be9ea339b3262d783f2512cf",
       "sourceName": "contracts/NoFeeToken.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -42,7 +42,7 @@
       "contentHash": "2cd550cedf51b8d294607dad5023d717",
       "sourceName": "@openzeppelin/contracts/token/ERC20/ERC20.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -80,7 +80,7 @@
       "contentHash": "0eac3e1a83ee62326ca007811285b274",
       "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -114,7 +114,7 @@
       "contentHash": "aa1be06992a99bb7393b26a6af3c4dfb",
       "sourceName": "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -150,7 +150,7 @@
       "contentHash": "851485d5b925529b1a2f34a0be077891",
       "sourceName": "@openzeppelin/contracts/utils/Context.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -184,7 +184,7 @@
       "contentHash": "4fe56b59ced59d87df6b796758f62895",
       "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -216,11 +216,11 @@
       ]
     },
     "D:\\mjs\\MJNote\\git\\babydoge-defi\\vaults\\contracts\\Vault.sol": {
-      "lastModificationDate": 1634161205570,
-      "contentHash": "f0059c977dfbd66e47ac92186d73fb3e",
+      "lastModificationDate": 1635815821672,
+      "contentHash": "df1f1260c03834cf1a241416d230fe95",
       "sourceName": "contracts/Vault.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -248,7 +248,7 @@
         "@openzeppelin/contracts/utils/math/SafeMath.sol"
       ],
       "versionPragmas": [
-        "0.8.0"
+        "0.8.9"
       ],
       "artifacts": [
         "Vault"
@@ -259,7 +259,7 @@
       "contentHash": "d37406082a74a9b6b114de522fcb6349",
       "sourceName": "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -326,11 +326,11 @@
       ]
     },
     "D:\\mjs\\MJNote\\git\\babydoge-defi\\vaults\\contracts\\SafeMath.sol": {
-      "lastModificationDate": 1632456834557,
+      "lastModificationDate": 1633468003087,
       "contentHash": "69fce59e0af05921c652c735e62d379d",
       "sourceName": "contracts/SafeMath.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -364,7 +364,7 @@
       "contentHash": "c5f6c4e4df069c789e7d84b4c3011913",
       "sourceName": "@openzeppelin/contracts/utils/Address.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
@@ -398,7 +398,7 @@
       "contentHash": "5365090efc586b728719e562ebfed0d6",
       "sourceName": "@openzeppelin/contracts/utils/math/SafeMath.sol",
       "solcConfig": {
-        "version": "0.8.0",
+        "version": "0.8.9",
         "settings": {
           "optimizer": {
             "enabled": false,
