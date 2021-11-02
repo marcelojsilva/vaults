@@ -353,7 +353,7 @@ contract Vault is Ownable {
         _totalDay.amount = vault.usersAmount;
         _totalDay.weight = vault.usersWeight;
 
-        emit Withdraw(address(msg.sender), _vid, user.amount);
+        emit Withdraw(address(msg.sender), _vid, amount);
 
     }
 
