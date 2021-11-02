@@ -2,11 +2,11 @@
  * @type import('hardhat/config').HardhatUserConfig
  */
 require('@nomiclabs/hardhat-waffle');
-require('dotenv').config({path: __dirname + '/.env'});
+require('dotenv').config({ path: __dirname + '/.env' });
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-gas-reporter");
 
-task('accounts', "Print all accounts").setAction(async () => {
+task('accounts', "Print all accounts").setAction(async() => {
     const accounts = await ethers.getSigners();
 
     for (const account of accounts) {
@@ -34,18 +34,11 @@ module.exports = {
                 runs: 200,
             }
         },
-        compilers: [
-            {
-                version: "0.6.12",
-            },
-            {
-                version: "0.5.0",
-            },
-            {
-                version: "0.6.2",
-            },
-            {
+        compilers: [{
                 version: "0.8.0",
+            },
+            {
+                version: "0.8.9",
             },
         ],
     },
