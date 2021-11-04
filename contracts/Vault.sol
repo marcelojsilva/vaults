@@ -182,17 +182,29 @@ contract Vault is Ownable {
             uint256,
             uint256,
             uint256,
-            uint256
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            IERC20,
+            IERC20
         )
     {
         VaultInfo memory vault = vaultInfo[_vid];
+        VaultToken memory vaultToken = vaultToken[_vid];
+        uint256 endDay = endVaultDay(_vid);
         return (
             vault.amountReward,
             vault.vaultTokenTax,
             vault.vaultDays,
             vault.minLockDays,
             vault.startVault,
-            endVaultDay(_vid)
+            endDay,
+            vault.userCount,
+            vault.usersAmount,
+            vault.usersWeight,
+            vaultToken.tokenStake,
+            vaultToken.tokenReward
         );
     }
 
