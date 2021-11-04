@@ -191,7 +191,7 @@ contract Vault is Ownable {
         )
     {
         VaultInfo memory vault = vaultInfo[_vid];
-        VaultToken memory vaultToken = vaultToken[_vid];
+        VaultToken memory vaultT = vaultToken[_vid];
         uint256 endDay = endVaultDay(_vid);
         return (
             vault.amountReward,
@@ -203,8 +203,8 @@ contract Vault is Ownable {
             vault.userCount,
             vault.usersAmount,
             vault.usersWeight,
-            vaultToken.tokenStake,
-            vaultToken.tokenReward
+            vaultT.tokenStake,
+            vaultT.tokenReward
         );
     }
 
