@@ -9,13 +9,14 @@
     "hardhat-gas-reporter": "^1.0.4"
   },
   "dependencies": {
-    "chai": "^4.3.4",
     "@openzeppelin/contracts": "^4.3.0",
     "axios": "^0.21.1",
+    "chai": "^4.3.4",
     "dotenv": "^10.0.0",
     "hardhat": "^2.6.4",
     "http-server": "^13.0.0",
     "qs": "^6.10.1",
+    "solidity-coverage": "^0.7.17",
     "web3": "^1.5.2"
   }
 }
