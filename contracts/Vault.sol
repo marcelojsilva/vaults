@@ -85,18 +85,10 @@ contract Vault is Ownable {
     ) external returns (uint256) {
         require(vaultKeys[key] == 0, "Vault Key Already used");
 
-        if (_tokenStake == _tokenReward) {
-            require(
-                _tokenStake.balanceOf(msg.sender) >= _amount,
-                "User has no tokens"
-            );
-        } else {
-            require(
-                _tokenReward.balanceOf(msg.sender) >= _amount,
-                "User has no tokens"
-            );
-        }
-
+        require(
+            _tokenReward.balanceOf(msg.sender) >= _amount,
+            "User has no tokens"
+        );
 
         require(_vaultDays > 0, "Vault days zero");
         require(
