@@ -84,22 +84,16 @@ contract Vault is Ownable {
         uint256 _amount
     ) external returns (uint256) {
         require(vaultKeys[key] == 0, "Vault Key Already used");
-
-        require(
-            _tokenReward.balanceOf(msg.sender) >= _amount,
-            "User has no tokens"
-        );
-
+        require(_tokenReward.balanceOf(msg.sender) >= _amount, "User has no tokens");
         require(_vaultDays > 0, "Vault days zero");
-        require(
-            _minLockDays <= _vaultDays,
-            "Minimum lock days greater then Vault days"
-        );
+        require(_minLockDays <= _vaultDays, "Minimum lock days greater then Vault days");
 
         uint256 tax = 0;
+
         if (!isBabyDoge(_tokenReward)) {
             tax = taxForNonBabyDogeCoin;
         }
+
         uint256 _amountReserve = (_amount * (100 - tax) / 100);
         uint256 _tax = (_amount * tax / 100);
 
@@ -108,17 +102,17 @@ contract Vault is Ownable {
         );
 
         VaultInfo memory vault = VaultInfo({
-        amountReward : _amountReserve,
-        vaultTokenTax : _tax,
-        startVault : block.timestamp,
-        vaultDays : _vaultDays,
-        minLockDays : _minLockDays,
-        userCount : 0,
-        usersAmount : 0,
-        usersWeight : 0,
-        isLpVault : _isLp,
-        paused : false,
-        lastTotalDay : block.timestamp.div(1 days).sub(1)
+            amountReward : _amountReserve,
+            vaultTokenTax : _tax,
+            startVault : block.timestamp,
+            vaultDays : _vaultDays,
+            minLockDays : _minLockDays,
+            userCount : 0,
+            usersAmount : 0,
+            usersWeight : 0,
+            isLpVault : _isLp,
+            paused : false,
+            lastTotalDay : block.timestamp.div(1 days).sub(1)
         });
 
         vaultInfo.push(vault);
@@ -130,14 +124,8 @@ contract Vault is Ownable {
         uint256 _today = today();
         TotalDay storage _totalDay = totalDay[vaultId][_today];
         _totalDay.amount = 0;
-        require(
-            _tokenReward.transferFrom(
-                address(msg.sender),
-                address(this),
-                _amount
-            ),
-            "Can't transfer tokens."
-        );
+
+        require(_tokenReward.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
 
         emit CreateVault(key, _tokenStake, _tokenReward, _isLp, _vaultDays, _minLockDays, _amount);
 
