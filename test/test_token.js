@@ -11,6 +11,7 @@ describe('Prepare Vault', () => {
     const totalVault1Rewards = 100000 * gwei;
     const vault0 = 0;
     const vault1 = 1;
+    const intervalMinutes = 60 * 10;
 
     beforeEach(async() => {
         Token = await ethers.getContractFactory('NoFeeToken');
@@ -20,7 +21,7 @@ describe('Prepare Vault', () => {
         );
         VaultContract = await ethers.getContractFactory('Vault');
         //Pass BabyDoge´s address token on deploy of the Vault
-        vaults = await VaultContract.deploy(token.address);
+        vaults = await VaultContract.deploy(token.address, intervalMinutes);
 
         token.transfer(addr1.address, bag);
         token.transfer(addr2.address, bag);
