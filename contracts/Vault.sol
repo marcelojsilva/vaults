@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "hardhat/console.sol";
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
@@ -24,6 +25,7 @@ contract Vault is Ownable {
         uint256 lastRewardDay;
         bool exists;
     }
+
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(uint256 => uint256) public vaultKeys;
 
@@ -31,7 +33,10 @@ contract Vault is Ownable {
         uint256 amount;
         uint256 weight;
     }
+
+
     mapping(uint256 => mapping(uint256 => TotalInterval)) public totalInterval;
+
 
     struct VaultToken {
         IERC20 tokenStake;
@@ -52,6 +57,7 @@ contract Vault is Ownable {
         bool paused;
         uint256 lastTotalInterval;
     }
+
     VaultToken[] public vaultToken;
     VaultInfo[] public vaultInfo;
 
@@ -82,26 +88,25 @@ contract Vault is Ownable {
         uint256 _minLockDays,
         uint256 _amount
     ) external returns (uint256) {
+
+        console.log('print');
+
         require(vaultKeys[key] == 0, "Vault Key Already used");
-        require(
-            _tokenStake.balanceOf(msg.sender) >= _amount,
-            "User has no tokens"
-        );
+        require(_tokenReward.balanceOf(msg.sender) >= _amount, "User has no tokens");
         require(_vaultDays > 0, "Vault days zero");
-        require(
-            _minLockDays <= _vaultDays,
-            "Minimum lock days greater then Vault days"
-        );
+        require(_minLockDays <= _vaultDays, "Minimum lock days greater then Vault days");
 
         uint256 tax = 0;
+
         if (!isBabyDoge(_tokenReward)) {
             tax = taxForNonBabyDogeCoin;
         }
+
         uint256 _amountReserve = (_amount * (100 - tax) / 100);
         uint256 _tax = (_amount * tax / 100);
 
         vaultToken.push(
-            VaultToken({tokenStake: _tokenStake, tokenReward: _tokenReward, vaultCreator: msg.sender})
+            VaultToken({tokenStake : _tokenStake, tokenReward : _tokenReward, vaultCreator : msg.sender})
         );
 
         VaultInfo memory vault = VaultInfo({
@@ -117,7 +122,7 @@ contract Vault is Ownable {
             paused: false,
             lastTotalInterval: block.timestamp.div(intervalMinutes).sub(1)
         });
-        
+
         vaultInfo.push(vault);
 
         uint256 vaultId = vaultInfo.length - 1;
@@ -136,6 +141,7 @@ contract Vault is Ownable {
             "Can't transfer tokens."
         );
 
+
         emit CreateVault(key, _tokenStake, _tokenReward, _isLp, _vaultDays, _minLockDays, _amount);
 
         return vaultId;
@@ -150,23 +156,23 @@ contract Vault is Ownable {
     }
 
     function getUserInfo(uint256 _vid, address _user)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        )
+    external
+    view
+    returns (
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256
+    )
     {
         UserInfo memory user = userInfo[_vid][_user];
         return (
-            user.amount,
-            user.weight,
-            user.rewardTotal,
-            user.rewardWithdraw,
-            user.lockTime
+        user.amount,
+        user.weight,
+        user.rewardTotal,
+        user.rewardWithdraw,
+        user.lockTime
         );
     }
 
@@ -176,37 +182,37 @@ contract Vault is Ownable {
     }
 
     function getVaultInfo(uint256 _vid)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            IERC20,
-            IERC20
-        )
+    external
+    view
+    returns (
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        IERC20,
+        IERC20
+    )
     {
         VaultInfo memory vault = vaultInfo[_vid];
         VaultToken memory vaultT = vaultToken[_vid];
         uint256 endDay = endVaultDay(_vid);
         return (
-            vault.amountReward,
-            vault.vaultTokenTax,
-            vault.vaultDays,
-            vault.minLockDays,
-            vault.startVault,
-            endDay,
-            vault.userCount,
-            vault.usersAmount,
-            vault.usersWeight,
-            vaultT.tokenStake,
-            vaultT.tokenReward
+        vault.amountReward,
+        vault.vaultTokenTax,
+        vault.vaultDays,
+        vault.minLockDays,
+        vault.startVault,
+        endDay,
+        vault.userCount,
+        vault.usersAmount,
+        vault.usersWeight,
+        vaultT.tokenStake,
+        vaultT.tokenReward
         );
     }
 
@@ -229,8 +235,10 @@ contract Vault is Ownable {
 
     function syncIntervals(uint256 _vid) internal {
         VaultInfo memory vault = vaultInfo[_vid];
+
         uint256 _lastInterval = lastInterval (_vid);
         uint256 _thisInterval = thisInterval();
+
         //Return if already sync
         if (vault.lastTotalInterval >= _lastInterval) {
             return;
@@ -354,6 +362,7 @@ contract Vault is Ownable {
 
         user.amount -= amount;
         vault.usersAmount -= user.amount;
+
         vault.lastTotalInterval = user.lastRewardDay;
         
         if (user.amount == 0) {
@@ -383,17 +392,20 @@ contract Vault is Ownable {
     }
 
     function calcRewardsUser(uint256 _vid, address _user)
-        public
-        view
-        returns (uint256)
+    public
+    view
+    returns (uint256)
     {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
+
         uint256 _lastInterval = lastInterval (_vid);
+
         uint256 reward = 0;
         uint256 rewardInterval = vault.amountReward.div(vault.vaultDays.mul((60*60*24)/intervalMinutes));
         uint256 weightedAverage = 0;
         uint256 userWeight = user.weight;
+
         for (uint256 d = user.lastRewardDay; d <= _lastInterval; d += 1) {
             TotalInterval memory _totalInterval = totalInterval[_vid][d];
             if (_totalInterval.weight > 0) {
@@ -403,8 +415,10 @@ contract Vault is Ownable {
                         weightedAverage.mul(userWeight).mul(1e9).div(
                             _totalInterval.amount
                         )
+
                     )
-                    .div(1e9);
+                )
+                .div(1e9);
             }
         }
         return reward;
