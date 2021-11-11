@@ -13,6 +13,7 @@ contract Vault is Ownable {
 
     uint256 public taxForNonBabyDogeCoin;
     IERC20 public babydoge;
+    uint256 public intervalMinutes;
 
     struct UserInfo {
         uint256 amount;
@@ -28,12 +29,14 @@ contract Vault is Ownable {
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(uint256 => uint256) public vaultKeys;
 
-    struct TotalDay {
+    struct TotalInterval {
         uint256 amount;
         uint256 weight;
     }
 
-    mapping(uint256 => mapping(uint256 => TotalDay)) public totalDay;
+
+    mapping(uint256 => mapping(uint256 => TotalInterval)) public totalInterval;
+
 
     struct VaultToken {
         IERC20 tokenStake;
@@ -52,7 +55,7 @@ contract Vault is Ownable {
         uint256 usersWeight;
         bool isLpVault;
         bool paused;
-        uint256 lastTotalDay;
+        uint256 lastTotalInterval;
     }
 
     VaultToken[] public vaultToken;
@@ -64,8 +67,9 @@ contract Vault is Ownable {
     event SetTaxForNonBabyDogeCoin(uint256 _taxForNonBabyDogeCoin);
     event CreateVault(uint256 key, IERC20 _tokenStake, IERC20 _tokenReward, bool _isLp, uint256 _vaultDays, uint256 _minLockDays, uint256 _amount);
 
-    constructor(IERC20 _babydoge) {
+    constructor(IERC20 _babydoge, uint256 _intervalMinutes) {
         babydoge = _babydoge;
+        intervalMinutes = _intervalMinutes;
     }
 
     function setTaxForNonBabyDogeCoin(uint256 _taxForNonBabyDogeCoin) external onlyOwner {
@@ -106,17 +110,17 @@ contract Vault is Ownable {
         );
 
         VaultInfo memory vault = VaultInfo({
-            amountReward : _amountReserve,
-            vaultTokenTax : _tax,
-            startVault : block.timestamp,
-            vaultDays : _vaultDays,
-            minLockDays : _minLockDays,
-            userCount : 0,
-            usersAmount : 0,
-            usersWeight : 0,
-            isLpVault : _isLp,
-            paused : false,
-            lastTotalDay : block.timestamp.div(1 days).sub(1)
+            amountReward: _amountReserve,
+            vaultTokenTax: _tax,
+            startVault: block.timestamp,
+            vaultDays: _vaultDays,
+            minLockDays: _minLockDays,
+            userCount: 0,
+            usersAmount: 0,
+            usersWeight: 0,
+            isLpVault: _isLp,
+            paused: false,
+            lastTotalInterval: block.timestamp.div(intervalMinutes).sub(1)
         });
 
         vaultInfo.push(vault);
@@ -125,11 +129,18 @@ contract Vault is Ownable {
 
         vaultKeys[key] = vaultId;
 
-        uint256 _today = today();
-        TotalDay storage _totalDay = totalDay[vaultId][_today];
-        _totalDay.amount = 0;
+        uint256 _thisInterval = thisInterval();
+        TotalInterval storage _totalInterval = totalInterval[vaultId][_thisInterval];
+        _totalInterval.amount = 0;
+        require(
+            _tokenReward.transferFrom(
+                address(msg.sender),
+                address(this),
+                _amount
+            ),
+            "Can't transfer tokens."
+        );
 
-        require(_tokenReward.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
 
         emit CreateVault(key, _tokenStake, _tokenReward, _isLp, _vaultDays, _minLockDays, _amount);
 
@@ -210,33 +221,35 @@ contract Vault is Ownable {
         return vault.startVault.add(vault.vaultDays * 24 * 60 * 60);
     }
 
-    function today() internal view returns (uint256) {
-        return block.timestamp.div(1 days);
+    function thisInterval() internal view returns (uint256) {
+        return block.timestamp.div(intervalMinutes);
     }
 
-    function yesterday(uint256 _vid) internal view returns (uint256) {
+    function lastInterval (uint256 _vid) internal view returns (uint256) {
         uint256 endVault = endVaultDay(_vid);
         return
-        block.timestamp > endVault
-        ? endVault.div(1 days).sub(1)
-        : block.timestamp.div(1 days).sub(1);
+            block.timestamp > endVault
+                ? endVault.div(intervalMinutes).sub(1)
+                : block.timestamp.div(intervalMinutes).sub(1);
     }
 
-    function syncDays(uint256 _vid) internal {
+    function syncIntervals(uint256 _vid) internal {
         VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _yesterday = yesterday(_vid);
-        uint256 _today = today();
+
+        uint256 _lastInterval = lastInterval (_vid);
+        uint256 _thisInterval = thisInterval();
+
         //Return if already sync
-        if (vault.lastTotalDay >= _yesterday) {
+        if (vault.lastTotalInterval >= _lastInterval) {
             return;
         }
 
-        TotalDay memory _lastTotalDay = totalDay[_vid][vault.lastTotalDay];
-        //Sync days without movements
-        for (uint256 d = vault.lastTotalDay + 1; d < _today; d += 1) {
-            TotalDay storage _totalDay = totalDay[_vid][d];
-            _totalDay.amount = _lastTotalDay.amount;
-            _totalDay.weight = _lastTotalDay.weight;
+        TotalInterval memory _lastTotalInterval = totalInterval[_vid][vault.lastTotalInterval];
+        //Sync intervals without movements
+        for (uint256 d = vault.lastTotalInterval + 1; d < _thisInterval; d += 1) {
+            TotalInterval storage _totalInterval = totalInterval[_vid][d];
+            _totalInterval.amount = _lastTotalInterval.amount;
+            _totalInterval.weight = _lastTotalInterval.weight;
         }
     }
 
@@ -261,7 +274,7 @@ contract Vault is Ownable {
                 value
             )
         );
-        uint256 _today = today();
+        uint256 _thisInterval = thisInterval();
 
         UserInfo storage user = userInfo[_vid][msg.sender];
         uint256 stakeWeight = 0;
@@ -271,7 +284,7 @@ contract Vault is Ownable {
             _lockTime = _lockTime > endVault ? endVault : _lockTime;
             user.lockTime = _lockTime;
             user.lockDays = _lockDays;
-            user.lastRewardDay = _today;
+            user.lastRewardDay = _thisInterval;
             vault.userCount += 1;
             stakeWeight = (user.lockDays.mul(1e9)).div(vault.vaultDays).add(
                 1e9
@@ -284,15 +297,15 @@ contract Vault is Ownable {
 
         user.amount += value;
 
-        syncDays(_vid);
+        syncIntervals(_vid);
 
-        vault.lastTotalDay = _today;
+        vault.lastTotalInterval = _thisInterval;
         vault.usersAmount += value;
         vault.usersWeight += stakeWeight;
 
-        TotalDay storage _totalDay = totalDay[_vid][_today];
-        _totalDay.amount = vault.usersAmount;
-        _totalDay.weight = vault.usersWeight;
+        TotalInterval storage _totalInterval = totalInterval[_vid][_thisInterval];
+        _totalInterval.amount = vault.usersAmount;
+        _totalInterval.weight = vault.usersWeight;
 
         emit Deposit(address(msg.sender), _vid, value);
 
@@ -305,13 +318,13 @@ contract Vault is Ownable {
         require(!vault.paused, "Vault paused");
         UserInfo storage user = userInfo[_vid][msg.sender];
 
-        syncDays(_vid);
+        syncIntervals(_vid);
 
-        uint256 _today = today();
+        uint256 _thisInterval = thisInterval();
 
         uint256 userReward = calcRewardsUser(_vid, msg.sender);
 
-        user.lastRewardDay = _today;
+        user.lastRewardDay = _thisInterval;
         user.rewardTotal += userReward;
         uint256 remainingReward = user.rewardTotal.sub(user.rewardWithdraw);
 
@@ -336,21 +349,22 @@ contract Vault is Ownable {
         require(user.lockTime <= block.timestamp, "User in lock time");
         require(user.amount >= amount, "Withdraw amount greater than user amount");
 
-        syncDays(_vid);
+        syncIntervals(_vid);
 
-        uint256 _today = today();
+        uint256 _thisInterval = thisInterval();
 
         uint256 userReward = calcRewardsUser(_vid, msg.sender);
 
-        user.lastRewardDay = _today;
+        user.lastRewardDay = _thisInterval;
         user.rewardTotal += userReward;
 
         require(vaultT.tokenStake.transfer(address(msg.sender), amount));
 
         user.amount -= amount;
         vault.usersAmount -= user.amount;
-        vault.lastTotalDay = user.lastRewardDay;
 
+        vault.lastTotalInterval = user.lastRewardDay;
+        
         if (user.amount == 0) {
             user.exists = false;
             vault.userCount = vault.userCount - 1;
@@ -358,9 +372,9 @@ contract Vault is Ownable {
             user.weight = 0;
         }
 
-        TotalDay storage _totalDay = totalDay[_vid][_today];
-        _totalDay.amount = vault.usersAmount;
-        _totalDay.weight = vault.usersWeight;
+        TotalInterval storage _totalInterval = totalInterval[_vid][_thisInterval];
+        _totalInterval.amount = vault.usersAmount;
+        _totalInterval.weight = vault.usersWeight;
 
         emit Withdraw(address(msg.sender), _vid, amount);
 
@@ -384,19 +398,24 @@ contract Vault is Ownable {
     {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _yesterday = yesterday(_vid);
+
+        uint256 _lastInterval = lastInterval (_vid);
+
         uint256 reward = 0;
-        uint256 rewardDay = vault.amountReward.div(vault.vaultDays);
+        uint256 rewardInterval = vault.amountReward.div(vault.vaultDays.mul((60*60*24)/intervalMinutes));
         uint256 weightedAverage = 0;
         uint256 userWeight = user.weight;
-        for (uint256 d = user.lastRewardDay; d <= _yesterday; d += 1) {
-            TotalDay memory _totalDay = totalDay[_vid][d];
-            if (_totalDay.weight > 0) {
-                weightedAverage = _totalDay.amount.div(_totalDay.weight);
-                reward += rewardDay
-                .mul(
-                    weightedAverage.mul(userWeight).mul(1e9).div(
-                        _totalDay.amount
+
+        for (uint256 d = user.lastRewardDay; d <= _lastInterval; d += 1) {
+            TotalInterval memory _totalInterval = totalInterval[_vid][d];
+            if (_totalInterval.weight > 0) {
+                weightedAverage = _totalInterval.amount.div(_totalInterval.weight);
+                reward += rewardInterval
+                    .mul(
+                        weightedAverage.mul(userWeight).mul(1e9).div(
+                            _totalInterval.amount
+                        )
+
                     )
                 )
                 .div(1e9);
