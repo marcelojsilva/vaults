@@ -5,14 +5,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
+import "hardhat/console.sol";
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
     uint256 public taxForNonBabyDogeCoin;
     IERC20 public babydoge;
-    uint256 public intervalMinutes;
 
     struct UserInfo {
         uint256 amount;
@@ -21,17 +20,21 @@ contract Vault is Ownable {
         uint256 rewardWithdraw;
         uint256 lockTime;
         uint256 lockDays;
-        uint256 lastRewardDay;
+        uint256 lastRewardTimeStamp;
         bool exists;
     }
+
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(uint256 => uint256) public vaultKeys;
 
-    struct TotalInterval {
+    struct TotalPeriod {
         uint256 amount;
         uint256 weight;
     }
-    mapping(uint256 => mapping(uint256 => TotalInterval)) public totalInterval;
+
+    mapping(uint256 => mapping(uint256 => TotalPeriod)) public totalDay;
+    mapping(uint256 => mapping(uint256 => TotalPeriod)) public totalHour;
+    mapping(uint256 => mapping(uint256 => TotalPeriod)) public totalMinute;
 
     struct VaultToken {
         IERC20 tokenStake;
@@ -50,8 +53,9 @@ contract Vault is Ownable {
         uint256 usersWeight;
         bool isLpVault;
         bool paused;
-        uint256 lastTotalInterval;
+        uint256 lastTotalTimeStamp;
     }
+
     VaultToken[] public vaultToken;
     VaultInfo[] public vaultInfo;
 
@@ -61,9 +65,8 @@ contract Vault is Ownable {
     event SetTaxForNonBabyDogeCoin(uint256 _taxForNonBabyDogeCoin);
     event CreateVault(uint256 key, IERC20 _tokenStake, IERC20 _tokenReward, bool _isLp, uint256 _vaultDays, uint256 _minLockDays, uint256 _amount);
 
-    constructor(IERC20 _babydoge, uint256 _intervalMinutes) {
+    constructor(IERC20 _babydoge) {
         babydoge = _babydoge;
-        intervalMinutes = _intervalMinutes;
     }
 
     function setTaxForNonBabyDogeCoin(uint256 _taxForNonBabyDogeCoin) external onlyOwner {
@@ -83,58 +86,48 @@ contract Vault is Ownable {
         uint256 _amount
     ) external returns (uint256) {
         require(vaultKeys[key] == 0, "Vault Key Already used");
-        require(
-            _tokenStake.balanceOf(msg.sender) >= _amount,
-            "User has no tokens"
-        );
+        require(_tokenReward.balanceOf(msg.sender) >= _amount, "User has no tokens");
         require(_vaultDays > 0, "Vault days zero");
-        require(
-            _minLockDays <= _vaultDays,
-            "Minimum lock days greater then Vault days"
-        );
+        require(_minLockDays <= _vaultDays, "Minimum lock days greater then Vault days");
 
         uint256 tax = 0;
+
         if (!isBabyDoge(_tokenReward)) {
             tax = taxForNonBabyDogeCoin;
         }
+
         uint256 _amountReserve = (_amount * (100 - tax) / 100);
         uint256 _tax = (_amount * tax / 100);
 
         vaultToken.push(
-            VaultToken({tokenStake: _tokenStake, tokenReward: _tokenReward, vaultCreator: msg.sender})
+            VaultToken({tokenStake : _tokenStake, tokenReward : _tokenReward, vaultCreator : msg.sender})
         );
 
         VaultInfo memory vault = VaultInfo({
-            amountReward: _amountReserve,
-            vaultTokenTax: _tax,
-            startVault: block.timestamp,
-            vaultDays: _vaultDays,
-            minLockDays: _minLockDays,
-            userCount: 0,
-            usersAmount: 0,
-            usersWeight: 0,
-            isLpVault: _isLp,
-            paused: false,
-            lastTotalInterval: block.timestamp.div(intervalMinutes).sub(1)
+            amountReward : _amountReserve,
+            vaultTokenTax : _tax,
+            startVault : block.timestamp,
+            vaultDays : _vaultDays,
+            minLockDays : _minLockDays,
+            userCount : 0,
+            usersAmount : 0,
+            usersWeight : 0,
+            isLpVault : _isLp,
+            paused : false,
+            lastTotalTimeStamp : block.timestamp
         });
-        
+
         vaultInfo.push(vault);
 
         uint256 vaultId = vaultInfo.length - 1;
 
         vaultKeys[key] = vaultId;
 
-        uint256 _thisInterval = thisInterval();
-        TotalInterval storage _totalInterval = totalInterval[vaultId][_thisInterval];
-        _totalInterval.amount = 0;
-        require(
-            _tokenReward.transferFrom(
-                address(msg.sender),
-                address(this),
-                _amount
-            ),
-            "Can't transfer tokens."
-        );
+        // uint256 _today = today();
+        // TotalPeriod storage _totalDay = totalDay[vaultId][_today];
+        // _totalDay.amount = 0;
+
+        require(_tokenReward.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
 
         emit CreateVault(key, _tokenStake, _tokenReward, _isLp, _vaultDays, _minLockDays, _amount);
 
@@ -150,23 +143,23 @@ contract Vault is Ownable {
     }
 
     function getUserInfo(uint256 _vid, address _user)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        )
+    external
+    view
+    returns (
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256
+    )
     {
         UserInfo memory user = userInfo[_vid][_user];
         return (
-            user.amount,
-            user.weight,
-            user.rewardTotal,
-            user.rewardWithdraw,
-            user.lockTime
+        user.amount,
+        user.weight,
+        user.rewardTotal,
+        user.rewardWithdraw,
+        user.lockTime
         );
     }
 
@@ -176,37 +169,37 @@ contract Vault is Ownable {
     }
 
     function getVaultInfo(uint256 _vid)
-        external
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            IERC20,
-            IERC20
-        )
+    external
+    view
+    returns (
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        uint256,
+        IERC20,
+        IERC20
+    )
     {
         VaultInfo memory vault = vaultInfo[_vid];
         VaultToken memory vaultT = vaultToken[_vid];
         uint256 endDay = endVaultDay(_vid);
         return (
-            vault.amountReward,
-            vault.vaultTokenTax,
-            vault.vaultDays,
-            vault.minLockDays,
-            vault.startVault,
-            endDay,
-            vault.userCount,
-            vault.usersAmount,
-            vault.usersWeight,
-            vaultT.tokenStake,
-            vaultT.tokenReward
+        vault.amountReward,
+        vault.vaultTokenTax,
+        vault.vaultDays,
+        vault.minLockDays,
+        vault.startVault,
+        endDay,
+        vault.userCount,
+        vault.usersAmount,
+        vault.usersWeight,
+        vaultT.tokenStake,
+        vaultT.tokenReward
         );
     }
 
@@ -215,41 +208,180 @@ contract Vault is Ownable {
         return vault.startVault.add(vault.vaultDays * 24 * 60 * 60);
     }
 
-    function thisInterval() internal view returns (uint256) {
-        return block.timestamp.div(intervalMinutes);
+    function today() internal view returns (uint256) {
+        return block.timestamp.div(1 days);
     }
 
-    function lastInterval (uint256 _vid) internal view returns (uint256) {
+    function currentHour() internal view returns (uint256) {
+        return block.timestamp.div(1 hours);
+    }
+
+    function currentMinute() internal view returns (uint256) {
+        return block.timestamp.div(1 minutes);
+    }
+
+    function yesterday(uint256 _vid) internal view returns (uint256) {
         uint256 endVault = endVaultDay(_vid);
         return
-            block.timestamp > endVault
-                ? endVault.div(intervalMinutes).sub(1)
-                : block.timestamp.div(intervalMinutes).sub(1);
+        block.timestamp > endVault
+        ? endVault.div(1 days).sub(1)
+        : block.timestamp.div(1 days).sub(1);
     }
 
-    function syncIntervals(uint256 _vid) internal {
+    function lastHour(uint256 _vid) internal view returns (uint256) {
+        uint256 endVault = endVaultDay(_vid);
+        return
+        block.timestamp > endVault
+        ? endVault.div(1 hours).sub(1)
+        : block.timestamp.div(1 hours).sub(1);
+    }
+
+    function lastMinute(uint256 _vid) internal view returns (uint256) {
+        uint256 endVault = endVaultDay(_vid);
+        return
+        block.timestamp > endVault
+        ? endVault.div(1 minutes).sub(1)
+        : block.timestamp.div(1 minutes).sub(1);
+    }
+
+    function sync(uint256 _vid) internal {
         VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _lastInterval = lastInterval (_vid);
-        uint256 _thisInterval = thisInterval();
-        //Return if already sync
-        if (vault.lastTotalInterval >= _lastInterval) {
+        uint256 start;
+        uint256 end;
+        uint256 _amountHour;
+        uint256 _weightHour;
+        uint256 _amountDay;
+        uint256 _weightDay;
+        
+        if (vault.lastTotalTimeStamp.div(1 minutes) >= lastMinute(_vid).add(1)) {
             return;
         }
+        
+        TotalPeriod memory _lastTotalMinute0 = totalMinute[_vid][vault.lastTotalTimeStamp.div(1 minutes)];
 
-        TotalInterval memory _lastTotalInterval = totalInterval[_vid][vault.lastTotalInterval];
-        //Sync intervals without movements
-        for (uint256 d = vault.lastTotalInterval + 1; d < _thisInterval; d += 1) {
-            TotalInterval storage _totalInterval = totalInterval[_vid][d];
-            _totalInterval.amount = _lastTotalInterval.amount;
-            _totalInterval.weight = _lastTotalInterval.weight;
+        //**Calculate average total hour of lastTotalTimeStamp */
+
+        // Sum minutes from last exactly hour to last minute
+        start = vault.lastTotalTimeStamp.div(1 hours).mul(60);
+        end = vault.lastTotalTimeStamp.div(1 minutes);
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod memory _lastTotalMinute1 = totalMinute[_vid][d];
+            _amountHour += _lastTotalMinute1.amount;
+            _weightHour += _lastTotalMinute1.weight;
+            // console.log("d %d, amount %d, _weightHour %d", d, _amountHour, _weightHour);
+        }
+        // console.log("start %d, end %d amount %d", start, end, _amountHour);
+        //Calc minutes to exact hour
+        start = vault.lastTotalTimeStamp.div(1 minutes);
+        end = vault.lastTotalTimeStamp.div(1 hours).add(1).mul(60);
+        if (lastMinute(_vid).add(1) < end) {
+            end = lastMinute(_vid).add(1);
+        }
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod storage _lastTotalMinute2 = totalMinute[_vid][d];
+            _lastTotalMinute2.amount = _lastTotalMinute0.amount;
+            _lastTotalMinute2.weight = _lastTotalMinute0.weight;
+            _amountHour += _lastTotalMinute0.amount;
+            _weightHour += _lastTotalMinute0.weight;
+            // console.log("d %d, _amountHour %d, _weightHour %d", d, _amountHour, _weightHour);
+        }
+        // console.log("start %d, amount %d, _weightHour %d", start, _amountHour, _weightHour);
+        // Calc average hour
+        TotalPeriod storage _lastTotalHour1 = totalHour[_vid][vault.lastTotalTimeStamp.div(1 hours)];
+        _lastTotalHour1.amount = _amountHour.div(60);
+        _lastTotalHour1.weight = _weightHour.div(60);
+        // console.log("Average hour d %d, _lastTotalHour1.amount %d, _lastTotalHour1.weight %d", vault.lastTotalTimeStamp.div(1 hours), _lastTotalHour1.amount, _lastTotalHour1.weight);
+
+        //** Calculate average total day of lastTotalTimeStamp */
+
+        //Calc hours from next hour to midnight
+        start = vault.lastTotalTimeStamp.div(1 hours).add(1);
+        // end = vault.lastTotalTimeStamp.div(1 days).add(1).mul(24);
+        end = block.timestamp.div(1 hours);
+        if (lastHour(_vid).add(1) < end) {
+            end = lastHour(_vid).add(1);
+        }
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod storage _lastTotalHour2 = totalHour[_vid][d];
+            _lastTotalHour2.amount = _lastTotalMinute0.amount;
+            _lastTotalHour2.weight = _lastTotalMinute0.weight;
+        }
+
+        // start = vault.lastTotalTimeStamp.div(1 days).add(1);
+        // end = block.timestamp.div(1 days);
+        // // end = block.timestamp.div(1 hours);
+        // if (yesterday(_vid).add(1) < end) {
+        //     end = yesterday(_vid).add(1);
+        // }
+        // for (uint256 d = start; d < end; d += 1) {
+        //     TotalPeriod storage _lastTotalDay = totalDay[_vid][d];
+        //     _lastTotalDay.amount = _lastTotalMinute0.amount;
+        //     _lastTotalDay.weight = _lastTotalMinute0.weight;
+        // }
+
+        // // Sync lastTotalTimeStamp to next hours until last hour
+        // start = block.timestamp.div(1 days).mul(24);
+        // if (start < vault.lastTotalTimeStamp.div(1 hours).add(1)) {
+        //     start = vault.lastTotalTimeStamp.div(1 hours).add(1);
+        // }
+        // end = block.timestamp.div(1 hours);
+        // for (uint256 d = start; d < end; d += 1) {
+        //     TotalPeriod storage _lastTotalHour3 = totalHour[_vid][d];
+        //     _lastTotalHour3.amount = _lastTotalMinute0.amount;
+        //     _lastTotalHour3.weight = _lastTotalMinute0.weight;
+        // }
+
+        // Sync lastTotalTimeStamp from last hour to next minutes until last minute
+        start = block.timestamp.div(1 hours).mul(60);
+        if (start < vault.lastTotalTimeStamp.div(1 minutes)) {
+            start = vault.lastTotalTimeStamp.div(1 minutes);
+        }
+        end = block.timestamp.div(1 minutes);
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod storage _lastTotalMinute3 = totalMinute[_vid][d];
+            _lastTotalMinute3.amount = _lastTotalMinute0.amount;
+            _lastTotalMinute3.weight = _lastTotalMinute0.weight;
+        }
+
+    }
+
+    function syncMinutes2(uint256 _vid) internal {
+        VaultInfo memory vault = vaultInfo[_vid];
+        uint256 _currentMinute = lastMinute(_vid);
+        uint256 startBefore = vault.lastTotalTimeStamp.div(1 minutes);
+        uint256 endBefore;
+        uint256 startAfter;
+        uint256 endAfter;
+        //Return if already sync
+        if (startBefore > _currentMinute) {
+            return;
+        }
+        TotalPeriod memory _lastTotalMinute = totalMinute[_vid][startBefore];
+        //sync minutes to exact hour of last total hour
+        endBefore = vault.lastTotalTimeStamp.div(1 hours).add(1).mul(60);
+        if (_currentMinute < endBefore) {
+            endBefore = _currentMinute;
+            startAfter = endBefore;
+            endAfter = startAfter;
+        } else {
+            startAfter = block.timestamp.div(1 hours).mul(60);
+            endAfter = currentMinute();
+        }
+        //Sync Minutes without movements
+        for (uint256 d = startBefore; d < endBefore; d += 1) {
+            TotalPeriod storage _totalMinute = totalMinute[_vid][d];
+            _totalMinute.amount = _lastTotalMinute.amount;
+            _totalMinute.weight = _lastTotalMinute.weight;
+        }
+        //Sync minutes from last exact hour to last minute
+        for (uint256 d = startAfter; d < endAfter; d += 1) {
+            TotalPeriod storage _totalMinute = totalMinute[_vid][d];
+            _totalMinute.amount = _lastTotalMinute.amount;
+            _totalMinute.weight = _lastTotalMinute.weight;
         }
     }
 
-    function deposit(
-        uint256 _vid,
-        uint256 _lockDays,
-        uint256 value
-    ) external returns (bool) {
+    function deposit(uint256 _vid, uint256 _lockDays, uint256 value) external returns (bool) {
         require(value > 0, "Deposit must be greater than zero");
         VaultInfo storage vault = vaultInfo[_vid];
         VaultToken memory vaultT = vaultToken[_vid];
@@ -266,7 +398,6 @@ contract Vault is Ownable {
                 value
             )
         );
-        uint256 _thisInterval = thisInterval();
 
         UserInfo storage user = userInfo[_vid][msg.sender];
         uint256 stakeWeight = 0;
@@ -276,7 +407,7 @@ contract Vault is Ownable {
             _lockTime = _lockTime > endVault ? endVault : _lockTime;
             user.lockTime = _lockTime;
             user.lockDays = _lockDays;
-            user.lastRewardDay = _thisInterval;
+            user.lastRewardTimeStamp = block.timestamp;
             vault.userCount += 1;
             stakeWeight = (user.lockDays.mul(1e9)).div(vault.vaultDays).add(
                 1e9
@@ -289,15 +420,22 @@ contract Vault is Ownable {
 
         user.amount += value;
 
-        syncIntervals(_vid);
+        sync(_vid);
+        // syncHours(_vid);
+        // syncDays(_vid);
 
-        vault.lastTotalInterval = _thisInterval;
+        vault.lastTotalTimeStamp = block.timestamp;
         vault.usersAmount += value;
         vault.usersWeight += stakeWeight;
+        // console.log("Deposit vault.lastTotalTimeStamp.div(1 minutes) %d, vault.usersAmount %d, vault.usersWeight %d", vault.lastTotalTimeStamp.div(1 minutes), vault.usersAmount, vault.usersWeight);
 
-        TotalInterval storage _totalInterval = totalInterval[_vid][_thisInterval];
-        _totalInterval.amount = vault.usersAmount;
-        _totalInterval.weight = vault.usersWeight;
+        TotalPeriod storage _totalHour = totalHour[_vid][currentHour()];
+        _totalHour.amount = vault.usersAmount;
+        _totalHour.weight = vault.usersWeight;
+
+        TotalPeriod storage _totalMinute = totalMinute[_vid][currentMinute()];
+        _totalMinute.amount = vault.usersAmount;
+        _totalMinute.weight = vault.usersWeight;
 
         emit Deposit(address(msg.sender), _vid, value);
 
@@ -310,13 +448,11 @@ contract Vault is Ownable {
         require(!vault.paused, "Vault paused");
         UserInfo storage user = userInfo[_vid][msg.sender];
 
-        syncIntervals(_vid);
-
-        uint256 _thisInterval = thisInterval();
+        sync(_vid);
 
         uint256 userReward = calcRewardsUser(_vid, msg.sender);
 
-        user.lastRewardDay = _thisInterval;
+        user.lastRewardTimeStamp = block.timestamp;
         user.rewardTotal += userReward;
         uint256 remainingReward = user.rewardTotal.sub(user.rewardWithdraw);
 
@@ -341,21 +477,20 @@ contract Vault is Ownable {
         require(user.lockTime <= block.timestamp, "User in lock time");
         require(user.amount >= amount, "Withdraw amount greater than user amount");
 
-        syncIntervals(_vid);
-
-        uint256 _thisInterval = thisInterval();
+        sync(_vid);
+        // syncHours(_vid);
+        // syncMinutes(_vid);
 
         uint256 userReward = calcRewardsUser(_vid, msg.sender);
 
-        user.lastRewardDay = _thisInterval;
+        user.lastRewardTimeStamp = block.timestamp;
         user.rewardTotal += userReward;
 
         require(vaultT.tokenStake.transfer(address(msg.sender), amount));
 
         user.amount -= amount;
-        vault.usersAmount -= user.amount;
-        vault.lastTotalInterval = user.lastRewardDay;
-        
+        vault.usersAmount -= amount;
+        vault.lastTotalTimeStamp = user.lastRewardTimeStamp;
         if (user.amount == 0) {
             user.exists = false;
             vault.userCount = vault.userCount - 1;
@@ -363,9 +498,17 @@ contract Vault is Ownable {
             user.weight = 0;
         }
 
-        TotalInterval storage _totalInterval = totalInterval[_vid][_thisInterval];
-        _totalInterval.amount = vault.usersAmount;
-        _totalInterval.weight = vault.usersWeight;
+
+        TotalPeriod storage _totalHour = totalHour[_vid][currentHour()];
+        _totalHour.amount = vault.usersAmount;
+        _totalHour.weight = vault.usersWeight;
+
+        TotalPeriod storage _totalMinute = totalMinute[_vid][currentMinute()];
+        _totalMinute.amount = vault.usersAmount;
+        _totalMinute.weight = vault.usersWeight;
+        
+        // console.log("today() %d, currentHour() %d, currentMinute() %d", today(), currentHour(), currentMinute());
+        // console.log("_totalDay.amount %d, _totalHour.amount %d, _totalMinute.amount %d", _totalDay.amount, _totalHour.amount, _totalMinute.amount);
 
         emit Withdraw(address(msg.sender), _vid, amount);
 
@@ -382,30 +525,116 @@ contract Vault is Ownable {
         vault.vaultTokenTax = 0;
     }
 
-    function calcRewardsUser(uint256 _vid, address _user)
-        public
-        view
-        returns (uint256)
-    {
+    function calcRewardsUser(uint256 _vid, address _user) public view returns (uint256) {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _lastInterval = lastInterval (_vid);
+        uint256 _yesterday = yesterday(_vid);
+        uint256 rewardDay = vault.amountReward.div(vault.vaultDays);
+        uint256 rewardHour = rewardDay.div(24);
+        uint256 rewardMinute = rewardHour.div(60);
         uint256 reward = 0;
-        uint256 rewardInterval = vault.amountReward.div(vault.vaultDays.mul((60*60*24)/intervalMinutes));
+        uint256 start;
+        uint256 end;
+
+        //Calc minutes to exact hour
+        start = user.lastRewardTimeStamp.div(1 minutes);
+        end = user.lastRewardTimeStamp.div(1 hours).add(1).mul(60);
+        if (lastMinute(_vid).add(1) < end) {
+            end = lastMinute(_vid).add(1);
+        }
+        // console.log("Minute to exact hour start %d, end %d", start, end);
+        reward = CalcRewardMinute(_vid, start, end, rewardMinute, user.weight);
+        // console.log("Minute to exact hour reward %d", reward);
+
+        //Calc hours to midnight 
+        start = user.lastRewardTimeStamp.div(1 hours).add(1);
+        // end = user.lastRewardTimeStamp.div(1 days).add(1).mul(24);
+        // // end = _yesterday.add(1).mul(24);
+        end = block.timestamp.div(1 hours);
+        if (lastHour(_vid).add(1) < end) {
+            end = lastHour(_vid).add(1);
+        }
+        // console.log("hour to last hour start %d, end %d",start, end);
+        reward += CalcRewardHour(_vid, start, end, rewardHour, user.weight);
+        // console.log("hour to last hour reward %d", reward);
+
+        // start = user.lastRewardTimeStamp.div(1 days).add(1);
+        // end = block.timestamp.div(1 days);
+        // if (_yesterday.add(1) < end) {
+        //     end = _yesterday.add(1);
+        // }
+        // // console.log("hour from midnight to last hour, start %d, end %d",start, end);
+        // reward += CalcRewardDay(_vid, start, end, rewardDay, user.weight);
+        // // console.log("hour from midnight to last hour, reward %d", reward);
+
+        // start = block.timestamp.div(1 days).mul(24);
+        // end = block.timestamp.div(1 hours);
+        // if (lastHour(_vid).add(1) < end) {
+        //     end = lastHour(_vid).add(1);
+        // }
+        // // console.log("hour from midnight to last hour, start %d, end %d",start, end);
+        // reward += CalcRewardHour(_vid, start, end, rewardHour, user.weight);
+        // // console.log("hour from midnight to last hour, reward %d", reward);
+
+        start = block.timestamp.div(1 hours).mul(60);
+        end = block.timestamp.div(1 minutes);
+        if (lastMinute(_vid).add(1) < end) {
+            end = lastMinute(_vid).add(1);
+        }
+        // console.log("Minute from exact hour to last minute, start %d, end %d", start, end);
+        reward += CalcRewardMinute(_vid, start, end, rewardMinute, user.weight);
+        // console.log("Minute from exact hour to last minute, reward %d", reward);
+
+        return reward;
+    }
+
+    function CalcRewardDay(uint256 _vid, uint256 start, uint256 end, uint256 rewardDay, uint256 userWeight) internal view returns (uint256) {
         uint256 weightedAverage = 0;
-        uint256 userWeight = user.weight;
-        for (uint256 d = user.lastRewardDay; d <= _lastInterval; d += 1) {
-            TotalInterval memory _totalInterval = totalInterval[_vid][d];
-            if (_totalInterval.weight > 0) {
-                weightedAverage = _totalInterval.amount.div(_totalInterval.weight);
-                reward += rewardInterval
-                    .mul(
-                        weightedAverage.mul(userWeight).mul(1e9).div(
-                            _totalInterval.amount
-                        )
-                    )
-                    .div(1e9);
+        uint256 reward = 0;
+        uint256 r;
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod memory _totalDay = totalDay[_vid][d];
+            r = 0;
+            if (_totalDay.weight > 0) {
+                weightedAverage = _totalDay.amount.div(_totalDay.weight);
+                r = rewardDay.mul(weightedAverage.mul(userWeight)) / _totalDay.amount;
+                reward += r;
             }
+            // console.log("_totalDay.amount %d, _totalDay.weight %d, reward %d", _totalDay.amount, _totalDay.weight, r);
+        }
+        return reward;
+    }
+
+    function CalcRewardHour(uint256 _vid, uint256 start, uint256 end, uint256 rewardHour, uint256 userWeight) internal view returns (uint256) {
+        uint256 weightedAverage = 0;
+        uint256 reward = 0;
+        uint256 r;
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod memory _totalHour = totalHour[_vid][d];
+            r = 0;
+            if (_totalHour.weight > 0) {
+                weightedAverage = _totalHour.amount.div(_totalHour.weight);
+                r = rewardHour.mul(weightedAverage.mul(userWeight)) / _totalHour.amount;
+                reward += r;
+            }
+            // console.log("_totalHour.amount %d, _totalHour.weight %d, reward %d", _totalHour.amount, _totalHour.weight, r);
+        }
+        return reward;
+    }
+
+    function CalcRewardMinute(uint256 _vid, uint256 start, uint256 end, uint256 rewardMinute, uint256 userWeight) internal view returns (uint256) {
+        uint256 weightedAverage = 0;
+        uint256 reward = 0;
+        uint256 r;
+        for (uint256 d = start; d < end; d += 1) {
+            TotalPeriod memory _totalMinute = totalMinute[_vid][d];
+            r = 0;
+            if (_totalMinute.weight > 0) {
+                weightedAverage = _totalMinute.amount.div(_totalMinute.weight);
+                r = rewardMinute.mul(weightedAverage.mul(userWeight)) / _totalMinute.amount;
+                reward += r;
+            }
+            // console.log("_totalMinute.amount %d, _totalMinute.weight %d, reward %d", _totalMinute.amount, _totalMinute.weight, r);
         }
         return reward;
     }
