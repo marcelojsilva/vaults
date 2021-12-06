@@ -5,7 +5,7 @@ async function main() {
   // eslint-disable-next-line no-undef
   const [deployer] = await ethers.getSigners();
   console.log(`Deploying contracts with the account: ${deployer.address}`);
-
+/*
   const thousand = ethers.utils.parseUnits("1000", "wei")
   const hundredthousand = ethers.utils.parseUnits("1000000", "wei")
   const lpSupply = ethers.utils.parseUnits("689895", "wei")
@@ -26,7 +26,7 @@ async function main() {
   const usdt = await USDT.deploy("USDT", "USDT", million);
   await usdt.deployed();
   console.log("BNB deployed to:", usdt.address.toString());
-
+*/
   const FAKELP = await hre.ethers.getContractFactory("FAKELP");
   const fakelp = await FAKELP.deploy("FAKELP", "FAKELP", lpSupply);
   await fakelp.deployed();

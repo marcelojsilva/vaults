@@ -36,6 +36,7 @@ contract Vault is Ownable {
     mapping(uint256 => mapping(uint256 => TotalPeriod)) public totalHour;
     mapping(uint256 => mapping(uint256 => TotalPeriod)) public totalMinute;
 
+
     struct VaultToken {
         IERC20 tokenStake;
         IERC20 tokenReward;
@@ -85,6 +86,9 @@ contract Vault is Ownable {
         uint256 _minLockDays,
         uint256 _amount
     ) external returns (uint256) {
+
+        console.log('print');
+
         require(vaultKeys[key] == 0, "Vault Key Already used");
         require(_tokenReward.balanceOf(msg.sender) >= _amount, "User has no tokens");
         require(_vaultDays > 0, "Vault days zero");
@@ -128,6 +132,7 @@ contract Vault is Ownable {
         // _totalDay.amount = 0;
 
         require(_tokenReward.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
+
 
         emit CreateVault(key, _tokenStake, _tokenReward, _isLp, _vaultDays, _minLockDays, _amount);
 
@@ -250,8 +255,8 @@ contract Vault is Ownable {
         uint256 end;
         uint256 _amountHour;
         uint256 _weightHour;
-        uint256 _amountDay;
-        uint256 _weightDay;
+        // uint256 _amountDay;
+        // uint256 _weightDay;
         
         if (vault.lastTotalTimeStamp.div(1 minutes) >= lastMinute(_vid).add(1)) {
             return;
@@ -528,7 +533,7 @@ contract Vault is Ownable {
     function calcRewardsUser(uint256 _vid, address _user) public view returns (uint256) {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _yesterday = yesterday(_vid);
+        // uint256 _yesterday = yesterday(_vid);
         uint256 rewardDay = vault.amountReward.div(vault.vaultDays);
         uint256 rewardHour = rewardDay.div(24);
         uint256 rewardMinute = rewardHour.div(60);
