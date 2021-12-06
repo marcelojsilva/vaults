@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "hardhat/console.sol";
+
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -126,10 +126,6 @@ contract Vault is Ownable {
         uint256 vaultId = vaultInfo.length - 1;
 
         vaultKeys[key] = vaultId;
-
-        // uint256 _today = today();
-        // TotalPeriod storage _totalDay = totalDay[vaultId][_today];
-        // _totalDay.amount = 0;
 
         require(_tokenReward.transferFrom(address(msg.sender), address(this), _amount), "Can't transfer tokens.");
 
@@ -255,8 +251,6 @@ contract Vault is Ownable {
         uint256 end;
         uint256 _amountHour;
         uint256 _weightHour;
-        // uint256 _amountDay;
-        // uint256 _weightDay;
         
         if (vault.lastTotalTimeStamp.div(1 minutes) >= lastMinute(_vid).add(1)) {
             return;
@@ -273,9 +267,7 @@ contract Vault is Ownable {
             TotalPeriod memory _lastTotalMinute1 = totalMinute[_vid][d];
             _amountHour += _lastTotalMinute1.amount;
             _weightHour += _lastTotalMinute1.weight;
-            // console.log("d %d, amount %d, _weightHour %d", d, _amountHour, _weightHour);
         }
-        // console.log("start %d, end %d amount %d", start, end, _amountHour);
         //Calc minutes to exact hour
         start = vault.lastTotalTimeStamp.div(1 minutes);
         end = vault.lastTotalTimeStamp.div(1 hours).add(1).mul(60);
@@ -288,20 +280,16 @@ contract Vault is Ownable {
             _lastTotalMinute2.weight = _lastTotalMinute0.weight;
             _amountHour += _lastTotalMinute0.amount;
             _weightHour += _lastTotalMinute0.weight;
-            // console.log("d %d, _amountHour %d, _weightHour %d", d, _amountHour, _weightHour);
         }
-        // console.log("start %d, amount %d, _weightHour %d", start, _amountHour, _weightHour);
         // Calc average hour
         TotalPeriod storage _lastTotalHour1 = totalHour[_vid][vault.lastTotalTimeStamp.div(1 hours)];
         _lastTotalHour1.amount = _amountHour.div(60);
         _lastTotalHour1.weight = _weightHour.div(60);
-        // console.log("Average hour d %d, _lastTotalHour1.amount %d, _lastTotalHour1.weight %d", vault.lastTotalTimeStamp.div(1 hours), _lastTotalHour1.amount, _lastTotalHour1.weight);
 
         //** Calculate average total day of lastTotalTimeStamp */
 
         //Calc hours from next hour to midnight
         start = vault.lastTotalTimeStamp.div(1 hours).add(1);
-        // end = vault.lastTotalTimeStamp.div(1 days).add(1).mul(24);
         end = block.timestamp.div(1 hours);
         if (lastHour(_vid).add(1) < end) {
             end = lastHour(_vid).add(1);
@@ -311,30 +299,6 @@ contract Vault is Ownable {
             _lastTotalHour2.amount = _lastTotalMinute0.amount;
             _lastTotalHour2.weight = _lastTotalMinute0.weight;
         }
-
-        // start = vault.lastTotalTimeStamp.div(1 days).add(1);
-        // end = block.timestamp.div(1 days);
-        // // end = block.timestamp.div(1 hours);
-        // if (yesterday(_vid).add(1) < end) {
-        //     end = yesterday(_vid).add(1);
-        // }
-        // for (uint256 d = start; d < end; d += 1) {
-        //     TotalPeriod storage _lastTotalDay = totalDay[_vid][d];
-        //     _lastTotalDay.amount = _lastTotalMinute0.amount;
-        //     _lastTotalDay.weight = _lastTotalMinute0.weight;
-        // }
-
-        // // Sync lastTotalTimeStamp to next hours until last hour
-        // start = block.timestamp.div(1 days).mul(24);
-        // if (start < vault.lastTotalTimeStamp.div(1 hours).add(1)) {
-        //     start = vault.lastTotalTimeStamp.div(1 hours).add(1);
-        // }
-        // end = block.timestamp.div(1 hours);
-        // for (uint256 d = start; d < end; d += 1) {
-        //     TotalPeriod storage _lastTotalHour3 = totalHour[_vid][d];
-        //     _lastTotalHour3.amount = _lastTotalMinute0.amount;
-        //     _lastTotalHour3.weight = _lastTotalMinute0.weight;
-        // }
 
         // Sync lastTotalTimeStamp from last hour to next minutes until last minute
         start = block.timestamp.div(1 hours).mul(60);
@@ -348,42 +312,6 @@ contract Vault is Ownable {
             _lastTotalMinute3.weight = _lastTotalMinute0.weight;
         }
 
-    }
-
-    function syncMinutes2(uint256 _vid) internal {
-        VaultInfo memory vault = vaultInfo[_vid];
-        uint256 _currentMinute = lastMinute(_vid);
-        uint256 startBefore = vault.lastTotalTimeStamp.div(1 minutes);
-        uint256 endBefore;
-        uint256 startAfter;
-        uint256 endAfter;
-        //Return if already sync
-        if (startBefore > _currentMinute) {
-            return;
-        }
-        TotalPeriod memory _lastTotalMinute = totalMinute[_vid][startBefore];
-        //sync minutes to exact hour of last total hour
-        endBefore = vault.lastTotalTimeStamp.div(1 hours).add(1).mul(60);
-        if (_currentMinute < endBefore) {
-            endBefore = _currentMinute;
-            startAfter = endBefore;
-            endAfter = startAfter;
-        } else {
-            startAfter = block.timestamp.div(1 hours).mul(60);
-            endAfter = currentMinute();
-        }
-        //Sync Minutes without movements
-        for (uint256 d = startBefore; d < endBefore; d += 1) {
-            TotalPeriod storage _totalMinute = totalMinute[_vid][d];
-            _totalMinute.amount = _lastTotalMinute.amount;
-            _totalMinute.weight = _lastTotalMinute.weight;
-        }
-        //Sync minutes from last exact hour to last minute
-        for (uint256 d = startAfter; d < endAfter; d += 1) {
-            TotalPeriod storage _totalMinute = totalMinute[_vid][d];
-            _totalMinute.amount = _lastTotalMinute.amount;
-            _totalMinute.weight = _lastTotalMinute.weight;
-        }
     }
 
     function deposit(uint256 _vid, uint256 _lockDays, uint256 value) external returns (bool) {
@@ -426,13 +354,10 @@ contract Vault is Ownable {
         user.amount += value;
 
         sync(_vid);
-        // syncHours(_vid);
-        // syncDays(_vid);
 
         vault.lastTotalTimeStamp = block.timestamp;
         vault.usersAmount += value;
         vault.usersWeight += stakeWeight;
-        // console.log("Deposit vault.lastTotalTimeStamp.div(1 minutes) %d, vault.usersAmount %d, vault.usersWeight %d", vault.lastTotalTimeStamp.div(1 minutes), vault.usersAmount, vault.usersWeight);
 
         TotalPeriod storage _totalHour = totalHour[_vid][currentHour()];
         _totalHour.amount = vault.usersAmount;
@@ -483,8 +408,6 @@ contract Vault is Ownable {
         require(user.amount >= amount, "Withdraw amount greater than user amount");
 
         sync(_vid);
-        // syncHours(_vid);
-        // syncMinutes(_vid);
 
         uint256 userReward = calcRewardsUser(_vid, msg.sender);
 
@@ -511,9 +434,6 @@ contract Vault is Ownable {
         TotalPeriod storage _totalMinute = totalMinute[_vid][currentMinute()];
         _totalMinute.amount = vault.usersAmount;
         _totalMinute.weight = vault.usersWeight;
-        
-        // console.log("today() %d, currentHour() %d, currentMinute() %d", today(), currentHour(), currentMinute());
-        // console.log("_totalDay.amount %d, _totalHour.amount %d, _totalMinute.amount %d", _totalDay.amount, _totalHour.amount, _totalMinute.amount);
 
         emit Withdraw(address(msg.sender), _vid, amount);
 
@@ -533,7 +453,6 @@ contract Vault is Ownable {
     function calcRewardsUser(uint256 _vid, address _user) public view returns (uint256) {
         UserInfo memory user = userInfo[_vid][_user];
         VaultInfo memory vault = vaultInfo[_vid];
-        // uint256 _yesterday = yesterday(_vid);
         uint256 rewardDay = vault.amountReward.div(vault.vaultDays);
         uint256 rewardHour = rewardDay.div(24);
         uint256 rewardMinute = rewardHour.div(60);
@@ -547,48 +466,22 @@ contract Vault is Ownable {
         if (lastMinute(_vid).add(1) < end) {
             end = lastMinute(_vid).add(1);
         }
-        // console.log("Minute to exact hour start %d, end %d", start, end);
         reward = CalcRewardMinute(_vid, start, end, rewardMinute, user.weight);
-        // console.log("Minute to exact hour reward %d", reward);
 
         //Calc hours to midnight 
         start = user.lastRewardTimeStamp.div(1 hours).add(1);
-        // end = user.lastRewardTimeStamp.div(1 days).add(1).mul(24);
-        // // end = _yesterday.add(1).mul(24);
         end = block.timestamp.div(1 hours);
         if (lastHour(_vid).add(1) < end) {
             end = lastHour(_vid).add(1);
         }
-        // console.log("hour to last hour start %d, end %d",start, end);
         reward += CalcRewardHour(_vid, start, end, rewardHour, user.weight);
-        // console.log("hour to last hour reward %d", reward);
-
-        // start = user.lastRewardTimeStamp.div(1 days).add(1);
-        // end = block.timestamp.div(1 days);
-        // if (_yesterday.add(1) < end) {
-        //     end = _yesterday.add(1);
-        // }
-        // // console.log("hour from midnight to last hour, start %d, end %d",start, end);
-        // reward += CalcRewardDay(_vid, start, end, rewardDay, user.weight);
-        // // console.log("hour from midnight to last hour, reward %d", reward);
-
-        // start = block.timestamp.div(1 days).mul(24);
-        // end = block.timestamp.div(1 hours);
-        // if (lastHour(_vid).add(1) < end) {
-        //     end = lastHour(_vid).add(1);
-        // }
-        // // console.log("hour from midnight to last hour, start %d, end %d",start, end);
-        // reward += CalcRewardHour(_vid, start, end, rewardHour, user.weight);
-        // // console.log("hour from midnight to last hour, reward %d", reward);
 
         start = block.timestamp.div(1 hours).mul(60);
         end = block.timestamp.div(1 minutes);
         if (lastMinute(_vid).add(1) < end) {
             end = lastMinute(_vid).add(1);
         }
-        // console.log("Minute from exact hour to last minute, start %d, end %d", start, end);
         reward += CalcRewardMinute(_vid, start, end, rewardMinute, user.weight);
-        // console.log("Minute from exact hour to last minute, reward %d", reward);
 
         return reward;
     }
@@ -605,7 +498,6 @@ contract Vault is Ownable {
                 r = rewardDay.mul(weightedAverage.mul(userWeight)) / _totalDay.amount;
                 reward += r;
             }
-            // console.log("_totalDay.amount %d, _totalDay.weight %d, reward %d", _totalDay.amount, _totalDay.weight, r);
         }
         return reward;
     }
@@ -622,7 +514,6 @@ contract Vault is Ownable {
                 r = rewardHour.mul(weightedAverage.mul(userWeight)) / _totalHour.amount;
                 reward += r;
             }
-            // console.log("_totalHour.amount %d, _totalHour.weight %d, reward %d", _totalHour.amount, _totalHour.weight, r);
         }
         return reward;
     }
@@ -639,7 +530,6 @@ contract Vault is Ownable {
                 r = rewardMinute.mul(weightedAverage.mul(userWeight)) / _totalMinute.amount;
                 reward += r;
             }
-            // console.log("_totalMinute.amount %d, _totalMinute.weight %d, reward %d", _totalMinute.amount, _totalMinute.weight, r);
         }
         return reward;
     }
